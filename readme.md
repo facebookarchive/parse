@@ -2,4 +2,4 @@ go.parse [![Build Status](https://secure.travis-ci.org/daaku/go.parse.png)](http
 ========
 
 Package parse provides a client for the [Parse API](https://parse.com/):
-Documentation: http://godoc.org/github.com/daaku/go.parse
+http://godoc.org/github.com/daaku/go.parse
