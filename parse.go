@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"path"
 	"strings"
 	"time"
 )
@@ -97,9 +98,9 @@ func (a ACL) ForRoleName(roleName RoleName) *Permissions {
 
 // Base Object.
 type Object struct {
-	ID        ID        `json:"objectId,omitempty"`
-	CreatedAt time.Time `json:"createdAt,omitempty"`
-	UpdatedAt time.Time `json:"updatedAt,omitempty"`
+	ID        ID         `json:"objectId,omitempty"`
+	CreatedAt *time.Time `json:"createdAt,omitempty"`
+	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
 }
 
 // User object.
@@ -401,4 +402,25 @@ func (c *Client) Transport(req *http.Request, result interface{}) error {
 		}
 	}
 	return nil
+}
+
+type ObjectClass struct {
+	Client    *Client
+	ClassName string
+}
+
+func (o *ObjectClass) Path(id ID) string {
+	return path.Join("classes", o.ClassName, string(id))
+}
+
+func (o *ObjectClass) Create(v interface{}) (*Object, error) {
+	r := new(Object)
+	if err := o.Client.Do("POST", o.Path(""), v, r); err != nil {
+		return nil, err
+	}
+	return r, nil
+}
+
+func (o *ObjectClass) Delete(id ID) error {
+	return o.Client.Do("DELETE", o.Path(id), nil, nil)
 }

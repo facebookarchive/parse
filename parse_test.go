@@ -267,3 +267,38 @@ func TestCreateDeleteObject(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestCreateDeleteObjectUsingObjectClass(t *testing.T) {
+	t.Parallel()
+	type obj struct {
+		parse.Object
+		Answer int `json:"answer"`
+	}
+	foo := &parse.ObjectClass{
+		Client:    defaultTestClient,
+		ClassName: "TestCreateDeleteObjectUsingObjectClass",
+	}
+
+	oCreate := &obj{Answer: 42}
+	oCreateResponse, err := foo.Create(oCreate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if oCreateResponse.ID == "" {
+		t.Fatal("did not get an ID in the response")
+	}
+
+	p := fmt.Sprintf("classes/%s/%s", foo.ClassName, oCreateResponse.ID)
+	oGet := &obj{}
+	err = defaultTestClient.Do("GET", p, nil, oGet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if oGet.Answer != oCreate.Answer {
+		t.Fatalf("did not get expected answer %d instead got %d", oCreate.Answer, oGet.Answer)
+	}
+
+	if err := foo.Delete(oGet.ID); err != nil {
+		t.Fatal(err)
+	}
+}
