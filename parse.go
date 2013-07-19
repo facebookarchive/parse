@@ -4,6 +4,7 @@ package parse
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -16,6 +17,9 @@ import (
 
 	"github.com/daaku/go.urlbuild"
 )
+
+var errPathCannotIncludeQuery = errors.New(
+	"path cannot include query, use Options instead")
 
 // An Object Identifier.
 type ID string
@@ -285,6 +289,14 @@ func (r *Request) ToHttpRequest(c *Client) (*http.Request, error) {
 		return nil, &internalError{
 			path:   r.Path,
 			actual: err,
+			client: c,
+		}
+	}
+
+	if u.RawQuery != "" {
+		return nil, &internalError{
+			path:   r.Path,
+			actual: errPathCannotIncludeQuery,
 			client: c,
 		}
 	}
