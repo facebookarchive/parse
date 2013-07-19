@@ -13,6 +13,8 @@ import (
 	"path"
 	"strings"
 	"time"
+
+	"github.com/daaku/go.urlbuild"
 )
 
 // An Object Identifier.
@@ -269,57 +271,38 @@ var DefaultBaseURL = &url.URL{
 	Path:   "/1/",
 }
 
-// Parse API Client.
-type Client struct {
-	BaseURL     *url.URL
-	Credentials *Credentials
-	HttpClient  HttpClient
-	Redact      bool // Redact sensitive information from errors when true
+type Request struct {
+	Method  string
+	Path    string
+	Options []urlbuild.Augment
+	Body    interface{}
 }
 
-// Perform a Parse API call. For responses in the 2xx or 3xx range the response
-// will be unmarshalled into result, for others an error of type Error will be
-// returned. The value will be JSON marshalled and sent as the request body.
-func (c *Client) Do(method string, path string, value interface{}, result interface{}) error {
-	req, err := c.NewRequest(method, path, value)
-	if err != nil {
-		return err
-	}
-
-	err = c.Transport(req, result)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Resolve the path relative to the base URL.
-func (c *Client) URL(p string) (*url.URL, error) {
-	u, err := url.Parse(p)
-	if err != nil {
-		return nil, err
-	}
-	if c.BaseURL == nil {
-		return DefaultBaseURL.ResolveReference(u), nil
-	}
-	return c.BaseURL.ResolveReference(u), nil
-}
-
-// Create a new http.Request for the given method, path and optional value
-// which will be JSON encoded if not nil.
-func (c *Client) NewRequest(method string, path string, value interface{}) (*http.Request, error) {
-	u, err := c.URL(path)
+// Make a http.Request out of this Request for the given Client.
+func (r *Request) ToHttpRequest(c *Client) (*http.Request, error) {
+	u, err := c.URL(r.Path)
 	if err != nil {
 		return nil, &internalError{
-			path:   path,
+			path:   r.Path,
 			actual: err,
 			client: c,
 		}
 	}
 
+	if len(r.Options) != 0 {
+		val, err := urlbuild.MakeValues(r.Options)
+		if err != nil {
+			return nil, &internalError{
+				path:   r.Path,
+				actual: err,
+				client: c,
+			}
+		}
+		u.RawQuery = val.Encode()
+	}
+
 	req := &http.Request{
-		Method:     method,
+		Method:     r.Method,
 		URL:        u,
 		Proto:      "HTTP/1.1",
 		ProtoMajor: 1,
@@ -332,11 +315,11 @@ func (c *Client) NewRequest(method string, path string, value interface{}) (*htt
 	}
 
 	// we need to buffer as Parse requires a Content-Length
-	if value != nil {
-		bd, err := json.Marshal(value)
+	if r.Body != nil {
+		bd, err := json.Marshal(r.Body)
 		if err != nil {
 			return nil, &internalError{
-				path:   path,
+				path:   r.Path,
 				actual: err,
 				client: c,
 			}
@@ -346,6 +329,39 @@ func (c *Client) NewRequest(method string, path string, value interface{}) (*htt
 	}
 
 	return req, nil
+}
+
+// Parse API Client.
+type Client struct {
+	BaseURL     *url.URL
+	Credentials *Credentials
+	HttpClient  HttpClient
+	Redact      bool // Redact sensitive information from errors when true
+}
+
+// Perform a Parse API call. For responses in the 2xx or 3xx range the response
+// will be unmarshalled into result, for others an error of type Error will be
+// returned. The value will be JSON marshalled and sent as the request body.
+func (c *Client) Do(req *Request, result interface{}) error {
+	hr, err := req.ToHttpRequest(c)
+	if err != nil {
+		return err
+	}
+
+	err = c.Transport(hr, result)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Resolve the path relative to the base URL.
+func (c *Client) URL(p string) (*url.URL, error) {
+	if c.BaseURL == nil {
+		return DefaultBaseURL.Parse(p)
+	}
+	return c.BaseURL.Parse(p)
 }
 
 // Transport makes a request and unmarshalls the JSON into result.
@@ -404,23 +420,39 @@ func (c *Client) Transport(req *http.Request, result interface{}) error {
 	return nil
 }
 
-type ObjectClass struct {
+// Provides access to the /classes/<ClassName> API.
+type ObjectDB struct {
 	Client    *Client
 	ClassName string
 }
 
-func (o *ObjectClass) Path(id ID) string {
+// Get the absolute path for the given object ID.
+func (o *ObjectDB) Path(id ID) string {
 	return path.Join("classes", o.ClassName, string(id))
 }
 
-func (o *ObjectClass) Create(v interface{}) (*Object, error) {
-	r := new(Object)
-	if err := o.Client.Do("POST", o.Path(""), v, r); err != nil {
+// Post a new instance with the given initial value.
+func (o *ObjectDB) Post(v interface{}) (*Object, error) {
+	res := new(Object)
+	req := Request{
+		Method: "POST",
+		Path:   o.Path(""),
+		Body:   v,
+	}
+	if err := o.Client.Do(&req, res); err != nil {
 		return nil, err
 	}
-	return r, nil
+	return res, nil
 }
 
-func (o *ObjectClass) Delete(id ID) error {
-	return o.Client.Do("DELETE", o.Path(id), nil, nil)
+// Delete the instance specified by id.
+func (o *ObjectDB) Delete(id ID) error {
+	req := Request{Method: "DELETE", Path: o.Path(id)}
+	return o.Client.Do(&req, nil)
+}
+
+// Get an existing instance specified by id.
+func (o *ObjectDB) Get(id ID, result interface{}) error {
+	req := Request{Method: "GET", Path: o.Path(id)}
+	return o.Client.Do(&req, result)
 }

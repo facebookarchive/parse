@@ -124,7 +124,8 @@ func TestInvalidPath(t *testing.T) {
 		HttpClient:  httpClient,
 		Credentials: &parse.Credentials{},
 	}
-	err := c.Do("GET", ":", nil, nil)
+	req := parse.Request{Method: "GET", Path: ":"}
+	err := c.Do(&req, nil)
 	if err == nil {
 		t.Fatal("was expecting error")
 	}
@@ -141,7 +142,8 @@ func TestInvalidBaseURLWith(t *testing.T) {
 		HttpClient:  httpClient,
 		Credentials: &parse.Credentials{},
 	}
-	err := c.Do("GET", "", nil, nil)
+	req := parse.Request{Method: "GET"}
+	err := c.Do(&req, nil)
 	if err == nil {
 		t.Fatal("was expecting error")
 	}
@@ -162,7 +164,8 @@ func TestUnreachableURL(t *testing.T) {
 		HttpClient:  httpClient,
 		Credentials: &parse.Credentials{},
 	}
-	err := c.Do("GET", "/", nil, nil)
+	req := parse.Request{Method: "GET", Path: "/"}
+	err := c.Do(&req, nil)
 	if err == nil {
 		t.Fatal("was expecting error")
 	}
@@ -178,7 +181,8 @@ func TestInvalidUnauthorizedRequest(t *testing.T) {
 		HttpClient:  httpClient,
 		Credentials: &parse.Credentials{},
 	}
-	err := c.Do("GET", "classes/Foo/Bar", nil, nil)
+	req := parse.Request{Method: "GET", Path: "classes/Foo/Bar"}
+	err := c.Do(&req, nil)
 	if err == nil {
 		t.Fatal("was expecting error")
 	}
@@ -204,7 +208,8 @@ func TestRedact(t *testing.T) {
 	}
 	p := "/_JavaScriptKey=js-key&_MasterKey=ms-key"
 
-	err := c.Do("GET", p, nil, nil)
+	req := parse.Request{Method: "GET", Path: p}
+	err := c.Do(&req, nil)
 	if err == nil {
 		t.Fatal("was expecting error")
 	}
@@ -214,7 +219,7 @@ func TestRedact(t *testing.T) {
 	}
 
 	c.Redact = true
-	err = c.Do("GET", p, nil, nil)
+	err = c.Do(&req, nil)
 	if err == nil {
 		t.Fatal("was expecting error")
 	}
@@ -226,7 +231,8 @@ func TestRedact(t *testing.T) {
 
 func TestInvalidGetRequest(t *testing.T) {
 	t.Parallel()
-	err := defaultTestClient.Do("GET", "classes/Foo/Bar", nil, nil)
+	req := parse.Request{Method: "GET", Path: "classes/Foo/Bar"}
+	err := defaultTestClient.Do(&req, nil)
 	if err == nil {
 		t.Fatal("was expecting error")
 	}
@@ -236,66 +242,68 @@ func TestInvalidGetRequest(t *testing.T) {
 	}
 }
 
-func TestCreateDeleteObject(t *testing.T) {
+func TestPostDeleteObject(t *testing.T) {
 	t.Parallel()
 	type obj struct {
 		Answer int `json:"answer"`
 	}
 
-	oCreate := &obj{Answer: 42}
-	oCreateResponse := &parse.Object{}
-	err := defaultTestClient.Do("POST", "classes/Foo", oCreate, oCreateResponse)
+	oPost := &obj{Answer: 42}
+	oPostResponse := &parse.Object{}
+	oPostReq := parse.Request{Method: "POST", Path: "classes/Foo", Body: oPost}
+	err := defaultTestClient.Do(&oPostReq, oPostResponse)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if oCreateResponse.ID == "" {
+	if oPostResponse.ID == "" {
 		t.Fatal("did not get an ID in the response")
 	}
 
-	p := fmt.Sprintf("classes/Foo/%s", oCreateResponse.ID)
+	p := fmt.Sprintf("classes/Foo/%s", oPostResponse.ID)
 	oGet := &obj{}
-	err = defaultTestClient.Do("GET", p, nil, oGet)
+	oGetReq := parse.Request{Method: "GET", Path: p}
+	err = defaultTestClient.Do(&oGetReq, oGet)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if oGet.Answer != oCreate.Answer {
-		t.Fatalf("did not get expected answer %d instead got %d", oCreate.Answer, oGet.Answer)
+	if oGet.Answer != oPost.Answer {
+		t.Fatalf("did not get expected answer %d instead got %d", oPost.Answer, oGet.Answer)
 	}
 
-	err = defaultTestClient.Do("DELETE", p, nil, nil)
+	oDelReq := parse.Request{Method: "DELETE", Path: p}
+	err = defaultTestClient.Do(&oDelReq, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 
-func TestCreateDeleteObjectUsingObjectClass(t *testing.T) {
+func TestPostDeleteObjectUsingObjectClass(t *testing.T) {
 	t.Parallel()
 	type obj struct {
 		parse.Object
 		Answer int `json:"answer"`
 	}
-	foo := &parse.ObjectClass{
+	foo := &parse.ObjectDB{
 		Client:    defaultTestClient,
-		ClassName: "TestCreateDeleteObjectUsingObjectClass",
+		ClassName: "TestPostDeleteObjectUsingObjectClass",
 	}
 
-	oCreate := &obj{Answer: 42}
-	oCreateResponse, err := foo.Create(oCreate)
+	oPost := &obj{Answer: 42}
+	oPostResponse, err := foo.Post(oPost)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if oCreateResponse.ID == "" {
+	if oPostResponse.ID == "" {
 		t.Fatal("did not get an ID in the response")
 	}
 
-	p := fmt.Sprintf("classes/%s/%s", foo.ClassName, oCreateResponse.ID)
 	oGet := &obj{}
-	err = defaultTestClient.Do("GET", p, nil, oGet)
+	err = foo.Get(oPostResponse.ID, oGet)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if oGet.Answer != oCreate.Answer {
-		t.Fatalf("did not get expected answer %d instead got %d", oCreate.Answer, oGet.Answer)
+	if oGet.Answer != oPost.Answer {
+		t.Fatalf("did not get expected answer %d instead got %d", oPost.Answer, oGet.Answer)
 	}
 
 	if err := foo.Delete(oGet.ID); err != nil {
