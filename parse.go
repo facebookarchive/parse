@@ -19,7 +19,7 @@ import (
 )
 
 var errPathCannotIncludeQuery = errors.New(
-	"path cannot include query, use Options instead")
+	"path cannot include query, use Params instead")
 
 // An Object Identifier.
 type ID string
@@ -142,7 +142,11 @@ func redactIf(c *Client, s string) string {
 	if c.Redact {
 		var args []string
 		if c.Credentials.JavaScriptKey != "" {
-			args = append(args, c.Credentials.JavaScriptKey, "-- REDACTED JAVASCRIPT KEY --")
+			args = append(
+				args,
+				c.Credentials.JavaScriptKey,
+				"-- REDACTED JAVASCRIPT KEY --",
+			)
 		}
 		if c.Credentials.MasterKey != "" {
 			args = append(args, c.Credentials.MasterKey, "-- REDACTED MASTER KEY --")
@@ -276,10 +280,10 @@ var DefaultBaseURL = &url.URL{
 }
 
 type Request struct {
-	Method  string
-	Path    string
-	Options []urlbuild.Augment
-	Body    interface{}
+	Method string
+	Path   string
+	Params []urlbuild.Param
+	Body   interface{}
 }
 
 // Make a http.Request out of this Request for the given Client.
@@ -301,8 +305,8 @@ func (r *Request) ToHttpRequest(c *Client) (*http.Request, error) {
 		}
 	}
 
-	if len(r.Options) != 0 {
-		val, err := urlbuild.MakeValues(r.Options)
+	if len(r.Params) != 0 {
+		val, err := urlbuild.MakeValues(r.Params)
 		if err != nil {
 			return nil, &internalError{
 				path:   r.Path,

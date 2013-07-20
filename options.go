@@ -7,7 +7,7 @@ import (
 )
 
 // Specify relations or pointers to include.
-func OptionInclude(include []string) urlbuild.Augment {
+func ParamInclude(include []string) urlbuild.Param {
 	if len(include) == 0 {
 		return urlbuild.Nil()
 	}
@@ -15,7 +15,7 @@ func OptionInclude(include []string) urlbuild.Augment {
 }
 
 // Specify the ordering.
-func OptionOrder(order string) urlbuild.Augment {
+func ParamOrder(order string) urlbuild.Param {
 	if order == "" {
 		return urlbuild.Nil()
 	}
@@ -23,19 +23,19 @@ func OptionOrder(order string) urlbuild.Augment {
 }
 
 // Specify a limit. Note, 0 values are also sent.
-func OptionLimit(limit uint64) urlbuild.Augment {
+func ParamLimit(limit uint64) urlbuild.Param {
 	return urlbuild.Uint64("limit", limit)
 }
 
 var optionCount = urlbuild.String("count", "1")
 
 // Specify that total count should be returned.
-func OptionCount() urlbuild.Augment {
+func ParamCount() urlbuild.Param {
 	return optionCount
 }
 
 // Specify number of items to skip. Note, 0 values are not sent.
-func OptionSkip(skip uint64) urlbuild.Augment {
+func ParamSkip(skip uint64) urlbuild.Param {
 	if skip == 0 {
 		return urlbuild.Nil()
 	}
@@ -43,7 +43,7 @@ func OptionSkip(skip uint64) urlbuild.Augment {
 }
 
 // Specify keys to fetch.
-func OptionKeys(keys []string) urlbuild.Augment {
+func ParamKeys(keys []string) urlbuild.Param {
 	if len(keys) == 0 {
 		return urlbuild.Nil()
 	}
@@ -51,6 +51,6 @@ func OptionKeys(keys []string) urlbuild.Augment {
 }
 
 // Specify a value to be JSON encoded and used as the where option.
-func OptionWhere(where interface{}) urlbuild.Augment {
+func ParamWhere(where interface{}) urlbuild.Param {
 	return urlbuild.JSON("where", where)
 }
