@@ -287,7 +287,7 @@ type Request struct {
 }
 
 // Make a http.Request out of this Request for the given Client.
-func (r *Request) ToHttpRequest(c *Client) (*http.Request, error) {
+func (r *Request) toHttpRequest(c *Client) (*http.Request, error) {
 	u, err := c.URL(r.Path)
 	if err != nil {
 		return nil, &internalError{
@@ -359,7 +359,7 @@ type Client struct {
 // will be unmarshalled into result, for others an error of type Error will be
 // returned. The value will be JSON marshalled and sent as the request body.
 func (c *Client) Do(req *Request, result interface{}) error {
-	hr, err := req.ToHttpRequest(c)
+	hr, err := req.toHttpRequest(c)
 	if err != nil {
 		return err
 	}
