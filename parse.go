@@ -11,15 +11,14 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"path"
 	"strings"
 	"time"
 
 	"github.com/daaku/go.urlbuild"
 )
 
-var errPathCannotIncludeQuery = errors.New(
-	"path cannot include query, use Params instead")
+var errURLCannotIncludeQuery = errors.New(
+	"URL cannot include query, use Params instead")
 
 // An Object Identifier.
 type ID string
@@ -213,8 +212,8 @@ func (e *redactError) Error() string {
 
 // An internal error during request processing.
 type internalError struct {
-	// Contains the path string if request is unavailable.
-	path string
+	// Contains the URL if request is unavailable.
+	url *url.URL
 
 	// May contain the *http.Request.
 	request *http.Request
@@ -231,7 +230,7 @@ type internalError struct {
 func (e *internalError) Error() string {
 	var buf bytes.Buffer
 	if e.request == nil {
-		fmt.Fprintf(&buf, `request for path "%s"`, e.path)
+		fmt.Fprintf(&buf, `request for URL "%s"`, e.url)
 	} else {
 		fmt.Fprintf(
 			&buf,
@@ -281,26 +280,17 @@ var DefaultBaseURL = &url.URL{
 
 type Request struct {
 	Method string
-	Path   string
+	URL    *url.URL
 	Params []urlbuild.Param
 	Body   interface{}
 }
 
 // Make a http.Request out of this Request for the given Client.
 func (r *Request) toHttpRequest(c *Client) (*http.Request, error) {
-	u, err := c.URL(r.Path)
-	if err != nil {
+	if r.URL.RawQuery != "" {
 		return nil, &internalError{
-			path:   r.Path,
-			actual: err,
-			client: c,
-		}
-	}
-
-	if u.RawQuery != "" {
-		return nil, &internalError{
-			path:   r.Path,
-			actual: errPathCannotIncludeQuery,
+			url:    r.URL,
+			actual: errURLCannotIncludeQuery,
 			client: c,
 		}
 	}
@@ -309,21 +299,21 @@ func (r *Request) toHttpRequest(c *Client) (*http.Request, error) {
 		val, err := urlbuild.MakeValues(r.Params)
 		if err != nil {
 			return nil, &internalError{
-				path:   r.Path,
+				url:    r.URL,
 				actual: err,
 				client: c,
 			}
 		}
-		u.RawQuery = val.Encode()
+		r.URL.RawQuery = val.Encode()
 	}
 
 	req := &http.Request{
 		Method:     r.Method,
-		URL:        u,
+		URL:        r.URL,
 		Proto:      "HTTP/1.1",
 		ProtoMajor: 1,
 		ProtoMinor: 1,
-		Host:       u.Host,
+		Host:       r.URL.Host,
 		Header: http.Header{
 			"X-Parse-Application-Id": []string{string(c.Credentials.ApplicationID)},
 			"X-Parse-REST-API-Key":   []string{c.Credentials.RestApiKey},
@@ -336,7 +326,7 @@ func (r *Request) toHttpRequest(c *Client) (*http.Request, error) {
 		if err != nil {
 			return nil, &internalError{
 				request: req,
-				path:    r.Path,
+				url:     r.URL,
 				actual:  err,
 				client:  c,
 			}
@@ -350,7 +340,6 @@ func (r *Request) toHttpRequest(c *Client) (*http.Request, error) {
 
 // Parse API Client.
 type Client struct {
-	BaseURL     *url.URL
 	Credentials *Credentials
 	HttpClient  HttpClient
 	Redact      bool // Redact sensitive information from errors when true
@@ -371,14 +360,6 @@ func (c *Client) Do(req *Request, result interface{}) error {
 	}
 
 	return nil
-}
-
-// Resolve the path relative to the base URL.
-func (c *Client) URL(p string) (*url.URL, error) {
-	if c.BaseURL == nil {
-		return DefaultBaseURL.Parse(p)
-	}
-	return c.BaseURL.Parse(p)
 }
 
 // Transport makes a request and unmarshalls the JSON into result.
@@ -437,23 +418,19 @@ func (c *Client) Transport(req *http.Request, result interface{}) error {
 	return nil
 }
 
-// Provides access to the /classes/<ClassName> API.
-type ObjectDB struct {
-	Client    *Client
-	ClassName string
-}
-
-// Get the absolute path for the given object ID.
-func (o *ObjectDB) Path(id ID) string {
-	return path.Join("classes", o.ClassName, string(id))
+// Provides access relative to a given BaseURL. This is useful to access by
+// Class Name or known built-ins like Users.
+type ResourceClient struct {
+	Client  *Client
+	BaseURL *url.URL
 }
 
 // Post a new instance with the given initial value.
-func (o *ObjectDB) Post(v interface{}) (*Object, error) {
+func (o *ResourceClient) Post(v interface{}) (*Object, error) {
 	res := new(Object)
 	req := Request{
 		Method: "POST",
-		Path:   o.Path(""),
+		URL:    o.BaseURL,
 		Body:   v,
 	}
 	if err := o.Client.Do(&req, res); err != nil {
@@ -463,13 +440,21 @@ func (o *ObjectDB) Post(v interface{}) (*Object, error) {
 }
 
 // Delete the instance specified by id.
-func (o *ObjectDB) Delete(id ID) error {
-	req := Request{Method: "DELETE", Path: o.Path(id)}
+func (o *ResourceClient) Delete(id ID) error {
+	u, err := o.BaseURL.Parse(string(id))
+	if err != nil {
+		return err
+	}
+	req := Request{Method: "DELETE", URL: u}
 	return o.Client.Do(&req, nil)
 }
 
 // Get an existing instance specified by id.
-func (o *ObjectDB) Get(id ID, result interface{}) error {
-	req := Request{Method: "GET", Path: o.Path(id)}
+func (o *ResourceClient) Get(id ID, result interface{}) error {
+	u, err := o.BaseURL.Parse(string(id))
+	if err != nil {
+		return err
+	}
+	req := Request{Method: "GET", URL: u}
 	return o.Client.Do(&req, result)
 }

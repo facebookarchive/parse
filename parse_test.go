@@ -118,32 +118,13 @@ func TestACL(t *testing.T) {
 	}
 }
 
-func TestInvalidPath(t *testing.T) {
-	t.Parallel()
-	c := &parse.Client{
-		BaseURL:     &url.URL{},
-		HttpClient:  httpClient,
-		Credentials: &parse.Credentials{},
-	}
-	req := parse.Request{Method: "GET", Path: ":"}
-	err := c.Do(&req, nil)
-	if err == nil {
-		t.Fatal("was expecting error")
-	}
-	const msg = `request for path ":" failed with error parse :: missing protocol scheme`
-	if actual := err.Error(); actual != msg {
-		t.Fatalf(`expected "%s" got "%s"`, msg, actual)
-	}
-}
-
 func TestInvalidBaseURLWith(t *testing.T) {
 	t.Parallel()
 	c := &parse.Client{
-		BaseURL:     &url.URL{},
 		HttpClient:  httpClient,
 		Credentials: &parse.Credentials{},
 	}
-	req := parse.Request{Method: "GET"}
+	req := parse.Request{Method: "GET", URL: &url.URL{}}
 	err := c.Do(&req, nil)
 	if err == nil {
 		t.Fatal("was expecting error")
@@ -157,15 +138,15 @@ func TestInvalidBaseURLWith(t *testing.T) {
 func TestUnreachableURL(t *testing.T) {
 	t.Parallel()
 	c := &parse.Client{
-		BaseURL: &url.URL{
-			Scheme: "https",
-			Host:   "www.eadf5cfd365145e99d2a3ddeec5d5f00.com",
-			Path:   "/",
-		},
 		HttpClient:  httpClient,
 		Credentials: &parse.Credentials{},
 	}
-	req := parse.Request{Method: "GET", Path: "/"}
+	u := &url.URL{
+		Scheme: "https",
+		Host:   "www.eadf5cfd365145e99d2a3ddeec5d5f00.com",
+		Path:   "/",
+	}
+	req := parse.Request{Method: "GET", URL: u}
 	err := c.Do(&req, nil)
 	if err == nil {
 		t.Fatal("was expecting error")
@@ -182,8 +163,12 @@ func TestInvalidUnauthorizedRequest(t *testing.T) {
 		HttpClient:  httpClient,
 		Credentials: &parse.Credentials{},
 	}
-	req := parse.Request{Method: "GET", Path: "classes/Foo/Bar"}
-	err := c.Do(&req, nil)
+	u, err := parse.DefaultBaseURL.Parse("classes/Foo/Bar")
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := parse.Request{Method: "GET", URL: u}
+	err = c.Do(&req, nil)
 	if err == nil {
 		t.Fatal("was expecting error")
 	}
@@ -200,16 +185,16 @@ func TestRedact(t *testing.T) {
 			JavaScriptKey: "js-key",
 			MasterKey:     "ms-key",
 		},
-		BaseURL: &url.URL{
-			Scheme: "https",
-			Host:   "www.eadf5cfd365145e99d2a3ddeec5d5f00.com",
-			Path:   "/",
-		},
 		HttpClient: httpClient,
 	}
 	p := "/_JavaScriptKey=js-key&_MasterKey=ms-key"
+	u := &url.URL{
+		Scheme: "https",
+		Host:   "www.eadf5cfd365145e99d2a3ddeec5d5f00.com",
+		Path:   p,
+	}
 
-	req := parse.Request{Method: "GET", Path: p}
+	req := parse.Request{Method: "GET", URL: u}
 	err := c.Do(&req, nil)
 	if err == nil {
 		t.Fatal("was expecting error")
@@ -232,8 +217,13 @@ func TestRedact(t *testing.T) {
 
 func TestInvalidGetRequest(t *testing.T) {
 	t.Parallel()
-	req := parse.Request{Method: "GET", Path: "classes/Foo/Bar"}
-	err := defaultTestClient.Do(&req, nil)
+	u, err := parse.DefaultBaseURL.Parse("classes/Foo/Bar")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req := parse.Request{Method: "GET", URL: u}
+	err = defaultTestClient.Do(&req, nil)
 	if err == nil {
 		t.Fatal("was expecting error")
 	}
@@ -249,10 +239,15 @@ func TestPostDeleteObject(t *testing.T) {
 		Answer int `json:"answer"`
 	}
 
+	oPostURL, err := parse.DefaultBaseURL.Parse("classes/Foo")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	oPost := &obj{Answer: 42}
 	oPostResponse := &parse.Object{}
-	oPostReq := parse.Request{Method: "POST", Path: "classes/Foo", Body: oPost}
-	err := defaultTestClient.Do(&oPostReq, oPostResponse)
+	oPostReq := parse.Request{Method: "POST", URL: oPostURL, Body: oPost}
+	err = defaultTestClient.Do(&oPostReq, oPostResponse)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -261,8 +256,13 @@ func TestPostDeleteObject(t *testing.T) {
 	}
 
 	p := fmt.Sprintf("classes/Foo/%s", oPostResponse.ID)
+	oGetURL, err := parse.DefaultBaseURL.Parse(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	oGet := &obj{}
-	oGetReq := parse.Request{Method: "GET", Path: p}
+	oGetReq := parse.Request{Method: "GET", URL: oGetURL}
 	err = defaultTestClient.Do(&oGetReq, oGet)
 	if err != nil {
 		t.Fatal(err)
@@ -271,7 +271,7 @@ func TestPostDeleteObject(t *testing.T) {
 		t.Fatalf("did not get expected answer %d instead got %d", oPost.Answer, oGet.Answer)
 	}
 
-	oDelReq := parse.Request{Method: "DELETE", Path: p}
+	oDelReq := parse.Request{Method: "DELETE", URL: oGetURL}
 	err = defaultTestClient.Do(&oDelReq, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -284,9 +284,15 @@ func TestPostDeleteObjectUsingObjectClass(t *testing.T) {
 		parse.Object
 		Answer int `json:"answer"`
 	}
-	foo := &parse.ObjectDB{
-		Client:    defaultTestClient,
-		ClassName: "TestPostDeleteObjectUsingObjectClass",
+
+	u, err := parse.DefaultBaseURL.Parse("classes/TestPostDeleteObjectUsingObjectClass/")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	foo := &parse.ResourceClient{
+		Client:  defaultTestClient,
+		BaseURL: u,
 	}
 
 	oPost := &obj{Answer: 42}
@@ -314,12 +320,17 @@ func TestPostDeleteObjectUsingObjectClass(t *testing.T) {
 
 func TestCannotSpecifyParamsInPath(t *testing.T) {
 	t.Parallel()
-	req := parse.Request{Method: "GET", Path: "classes/Foo/Bar?a=1"}
-	err := defaultTestClient.Do(&req, nil)
+	u, err := parse.DefaultBaseURL.Parse("classes/Foo/Bar?a=1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req := parse.Request{Method: "GET", URL: u}
+	err = defaultTestClient.Do(&req, nil)
 	if err == nil {
 		t.Fatal("was expecting error")
 	}
-	const msg = `request for path "classes/Foo/Bar?a=1" failed with error path cannot include query, use Params instead`
+	const msg = `request for URL "https://api.parse.com/1/classes/Foo/Bar?a=1" failed with error URL cannot include query, use Params instead`
 	if actual := err.Error(); actual != msg {
 		t.Fatalf(`expected "%s" got "%s"`, msg, actual)
 	}
@@ -327,12 +338,17 @@ func TestCannotSpecifyParamsInPath(t *testing.T) {
 
 func TestInvalidGetRequestWithParams(t *testing.T) {
 	t.Parallel()
+	u, err := parse.DefaultBaseURL.Parse("classes/Foo/Bar")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	req := parse.Request{
 		Method: "GET",
-		Path:   "classes/Foo/Bar",
+		URL:    u,
 		Params: []urlbuild.Param{parse.ParamLimit(0)},
 	}
-	err := defaultTestClient.Do(&req, nil)
+	err = defaultTestClient.Do(&req, nil)
 	if err == nil {
 		t.Fatal("was expecting error")
 	}
@@ -344,16 +360,21 @@ func TestInvalidGetRequestWithParams(t *testing.T) {
 
 func TestInvalidWhereParam(t *testing.T) {
 	t.Parallel()
+	u, err := parse.DefaultBaseURL.Parse("classes/Foo/Bar")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	req := parse.Request{
 		Method: "GET",
-		Path:   "classes/Foo/Bar",
+		URL:    u,
 		Params: []urlbuild.Param{parse.ParamWhere(map[int]int{})},
 	}
-	err := defaultTestClient.Do(&req, nil)
+	err = defaultTestClient.Do(&req, nil)
 	if err == nil {
 		t.Fatal("was expecting error")
 	}
-	const msg = `request for path "classes/Foo/Bar" failed with error for "where" json: unsupported type: map[int]int`
+	const msg = `request for URL "https://api.parse.com/1/classes/Foo/Bar" failed with error for "where" json: unsupported type: map[int]int`
 	if actual := err.Error(); actual != msg {
 		t.Fatalf(`expected "%s" got "%s"`, msg, actual)
 	}
@@ -361,12 +382,17 @@ func TestInvalidWhereParam(t *testing.T) {
 
 func TestInvalidBody(t *testing.T) {
 	t.Parallel()
+	u, err := parse.DefaultBaseURL.Parse("classes/Foo/Bar")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	req := parse.Request{
 		Method: "GET",
-		Path:   "classes/Foo/Bar",
+		URL:    u,
 		Body:   map[int]int{},
 	}
-	err := defaultTestClient.Do(&req, nil)
+	err = defaultTestClient.Do(&req, nil)
 	if err == nil {
 		t.Fatal("was expecting error")
 	}
