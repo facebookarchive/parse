@@ -353,7 +353,7 @@ func TestInvalidWhereParam(t *testing.T) {
 	if err == nil {
 		t.Fatal("was expecting error")
 	}
-	const msg = `request for path "classes/Foo/Bar" failed with error json: unsupported type: map[int]int`
+	const msg = `request for path "classes/Foo/Bar" failed with error for "where" json: unsupported type: map[int]int`
 	if actual := err.Error(); actual != msg {
 		t.Fatalf(`expected "%s" got "%s"`, msg, actual)
 	}
