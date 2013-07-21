@@ -335,9 +335,10 @@ func (r *Request) toHttpRequest(c *Client) (*http.Request, error) {
 		bd, err := json.Marshal(r.Body)
 		if err != nil {
 			return nil, &internalError{
-				path:   r.Path,
-				actual: err,
-				client: c,
+				request: req,
+				path:    r.Path,
+				actual:  err,
+				client:  c,
 			}
 		}
 		req.Body = ioutil.NopCloser(bytes.NewReader(bd))

@@ -358,3 +358,20 @@ func TestInvalidWhereParam(t *testing.T) {
 		t.Fatalf(`expected "%s" got "%s"`, msg, actual)
 	}
 }
+
+func TestInvalidBody(t *testing.T) {
+	t.Parallel()
+	req := parse.Request{
+		Method: "GET",
+		Path:   "classes/Foo/Bar",
+		Body:   map[int]int{},
+	}
+	err := defaultTestClient.Do(&req, nil)
+	if err == nil {
+		t.Fatal("was expecting error")
+	}
+	const msg = `GET request for URL "https://api.parse.com/1/classes/Foo/Bar" failed with error json: unsupported type: map[int]int`
+	if actual := err.Error(); actual != msg {
+		t.Fatalf(`expected "%s" got "%s"`, msg, actual)
+	}
+}
