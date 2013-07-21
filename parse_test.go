@@ -12,6 +12,7 @@ import (
 	"github.com/daaku/go.flagenv"
 	"github.com/daaku/go.httpcontrol"
 	"github.com/daaku/go.parse"
+	"github.com/daaku/go.urlbuild"
 )
 
 var (
@@ -319,6 +320,40 @@ func TestCannotSpecifyParamsInPath(t *testing.T) {
 		t.Fatal("was expecting error")
 	}
 	const msg = `request for path "classes/Foo/Bar?a=1" failed with error path cannot include query, use Params instead`
+	if actual := err.Error(); actual != msg {
+		t.Fatalf(`expected "%s" got "%s"`, msg, actual)
+	}
+}
+
+func TestInvalidGetRequestWithParams(t *testing.T) {
+	t.Parallel()
+	req := parse.Request{
+		Method: "GET",
+		Path:   "classes/Foo/Bar",
+		Params: []urlbuild.Param{parse.ParamLimit(0)},
+	}
+	err := defaultTestClient.Do(&req, nil)
+	if err == nil {
+		t.Fatal("was expecting error")
+	}
+	const msg = `GET request for URL https://api.parse.com/1/classes/Foo/Bar?limit=0 failed with code 101 and message object not found for get`
+	if actual := err.Error(); actual != msg {
+		t.Fatalf(`expected "%s" got "%s"`, msg, actual)
+	}
+}
+
+func TestInvalidWhereParam(t *testing.T) {
+	t.Parallel()
+	req := parse.Request{
+		Method: "GET",
+		Path:   "classes/Foo/Bar",
+		Params: []urlbuild.Param{parse.ParamWhere(map[int]int{})},
+	}
+	err := defaultTestClient.Do(&req, nil)
+	if err == nil {
+		t.Fatal("was expecting error")
+	}
+	const msg = `request for path "classes/Foo/Bar" failed with error json: unsupported type: map[int]int`
 	if actual := err.Error(); actual != msg {
 		t.Fatalf(`expected "%s" got "%s"`, msg, actual)
 	}
