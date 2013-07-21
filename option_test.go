@@ -24,3 +24,17 @@ func TestParamInclude(t *testing.T) {
 		t.Fatalf("expected:\n%+v\nactual:\n%+v", expected, actual)
 	}
 }
+
+func TestParamIncludeEmpty(t *testing.T) {
+	t.Parallel()
+	expected := url.Values{}
+	actual, err := urlbuild.MakeValues([]urlbuild.Param{
+		parse.ParamInclude([]string{}),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(expected, actual) {
+		t.Fatalf("expected:\n%+v\nactual:\n%+v", expected, actual)
+	}
+}
