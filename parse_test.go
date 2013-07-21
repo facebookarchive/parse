@@ -310,3 +310,16 @@ func TestPostDeleteObjectUsingObjectClass(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestCannotSpecifyParamsInPath(t *testing.T) {
+	t.Parallel()
+	req := parse.Request{Method: "GET", Path: "classes/Foo/Bar?a=1"}
+	err := defaultTestClient.Do(&req, nil)
+	if err == nil {
+		t.Fatal("was expecting error")
+	}
+	const msg = `request for path "classes/Foo/Bar?a=1" failed with error path cannot include query, use Params instead`
+	if actual := err.Error(); actual != msg {
+		t.Fatalf(`expected "%s" got "%s"`, msg, actual)
+	}
+}
