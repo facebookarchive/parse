@@ -290,7 +290,7 @@ func TestPostDeleteObjectUsingObjectClass(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	foo := &parse.ResourceClient{
+	foo := &parse.ObjectClient{
 		Client:  defaultTestClient,
 		BaseURL: u,
 	}

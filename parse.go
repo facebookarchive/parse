@@ -420,13 +420,13 @@ func (c *Client) Transport(req *http.Request, result interface{}) error {
 
 // Provides access relative to a given BaseURL. This is useful to access by
 // Class Name or known built-ins like Users.
-type ResourceClient struct {
+type ObjectClient struct {
 	Client  *Client
 	BaseURL *url.URL
 }
 
 // Post a new instance with the given initial value.
-func (o *ResourceClient) Post(v interface{}) (*Object, error) {
+func (o *ObjectClient) Post(v interface{}) (*Object, error) {
 	res := new(Object)
 	req := Request{
 		Method: "POST",
@@ -440,7 +440,7 @@ func (o *ResourceClient) Post(v interface{}) (*Object, error) {
 }
 
 // Delete the instance specified by id.
-func (o *ResourceClient) Delete(id ID) error {
+func (o *ObjectClient) Delete(id ID) error {
 	u, err := o.BaseURL.Parse(string(id))
 	if err != nil {
 		return err
@@ -450,7 +450,7 @@ func (o *ResourceClient) Delete(id ID) error {
 }
 
 // Get an existing instance specified by id.
-func (o *ResourceClient) Get(id ID, result interface{}) error {
+func (o *ObjectClient) Get(id ID, result interface{}) error {
 	u, err := o.BaseURL.Parse(string(id))
 	if err != nil {
 		return err
