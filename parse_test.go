@@ -16,19 +16,20 @@ import (
 )
 
 var (
-	httpTransport = &httpcontrol.Transport{
+	defaultHttpTransport = &httpcontrol.Transport{
 		MaxIdleConnsPerHost:   50,
 		DialTimeout:           time.Second,
 		ResponseHeaderTimeout: 30 * time.Second,
 		RequestTimeout:        time.Minute,
 		Stats:                 logRequestHandler,
 	}
-	httpClient         = &http.Client{Transport: httpTransport}
+	defaultHttpClient  = &http.Client{Transport: defaultHttpTransport}
 	defaultCredentials = parse.CredentialsFlag("parsetest")
-	defaultTestClient  = &parse.Client{
+	defaultParseClient = &parse.Client{
 		Credentials: defaultCredentials,
-		HttpClient:  httpClient,
+		HttpClient:  defaultHttpClient,
 	}
+
 	logRequest = flag.Bool(
 		"log-requests",
 		false,
@@ -37,16 +38,15 @@ var (
 )
 
 func init() {
+	defaultCredentials.ApplicationID = "spAVcBmdREXEk9IiDwXzlwe0p4pO7t18KFsHyk7j"
+	defaultCredentials.JavaScriptKey = "7TzsJ3Dgmb1WYPALhYX6BgDhNo99f5QCfxLZOPmO"
+	defaultCredentials.MasterKey = "3gPo5M3TGlFPvAaod7N4iSEtCmgupKZMIC2DoYJ3"
+	defaultCredentials.RestApiKey = "t6ON64DfTrTL4QJC322HpWbhN6fzGYo8cnjVttap"
+
 	flag.Usage = flagconfig.Usage
 	flagconfig.Parse()
 	flagenv.Parse()
-	if defaultCredentials.ApplicationID == "" {
-		defaultCredentials.ApplicationID = "spAVcBmdREXEk9IiDwXzlwe0p4pO7t18KFsHyk7j"
-		defaultCredentials.JavaScriptKey = "7TzsJ3Dgmb1WYPALhYX6BgDhNo99f5QCfxLZOPmO"
-		defaultCredentials.MasterKey = "3gPo5M3TGlFPvAaod7N4iSEtCmgupKZMIC2DoYJ3"
-		defaultCredentials.RestApiKey = "t6ON64DfTrTL4QJC322HpWbhN6fzGYo8cnjVttap"
-	}
-	if err := httpTransport.Start(); err != nil {
+	if err := defaultHttpTransport.Start(); err != nil {
 		panic(err)
 	}
 }
@@ -118,50 +118,115 @@ func TestACL(t *testing.T) {
 	}
 }
 
-func TestInvalidBaseURLWith(t *testing.T) {
-	t.Parallel()
-	c := &parse.Client{
-		HttpClient:  httpClient,
-		Credentials: &parse.Credentials{},
+func TestErrorCases(t *testing.T) {
+	cases := []struct {
+		Request *parse.Request
+		Error   string
+	}{
+		{
+			Request: &parse.Request{Method: "GET"},
+			Error:   `no URL provided`,
+		},
+		{
+			Request: &parse.Request{Method: "GET", URL: &url.URL{}},
+			Error:   `Get : unsupported protocol scheme ""`,
+		},
+		{
+			Request: &parse.Request{
+				Method: "GET",
+				URL: &url.URL{
+					Scheme: "https",
+					Host:   "www.eadf5cfd365145e99d2a3ddeec5d5f00.com",
+					Path:   "/",
+				},
+			},
+			Error: `Get https://www.eadf5cfd365145e99d2a3ddeec5d5f00.com/: ` +
+				`lookup www.eadf5cfd365145e99d2a3ddeec5d5f00.com: no such host`,
+		},
+		{
+			Request: &parse.Request{
+				Method: "GET",
+				URL: &url.URL{
+					Scheme: "https",
+					Host:   "api.parse.com",
+					Path:   "/1/classes/Foo/Bar",
+				},
+			},
+			Error: `GET request for URL https://api.parse.com/1/classes/Foo/Bar ` +
+				`failed with code 101 and message object not found for get`,
+		},
+		{
+			Request: &parse.Request{
+				Method: "GET",
+				URL: &url.URL{
+					Scheme:   "https",
+					Host:     "api.parse.com",
+					Path:     "/1/classes/Foo/Bar",
+					RawQuery: "a=1",
+				},
+			},
+			Error: `request for URL "https://api.parse.com/1/classes/Foo/Bar?a=1" ` +
+				`failed with error URL cannot include query, use Params instead`,
+		},
+		{
+			Request: &parse.Request{
+				Method: "GET",
+				URL: &url.URL{
+					Scheme: "https",
+					Host:   "api.parse.com",
+					Path:   "/1/classes/Foo/Bar",
+				},
+				Params: []urlbuild.Param{parse.ParamLimit(0)},
+			},
+			Error: `GET request for URL ` +
+				`https://api.parse.com/1/classes/Foo/Bar?limit=0 ` +
+				`failed with code 101 and message object not found for get`,
+		},
+		{
+			Request: &parse.Request{
+				Method: "GET",
+				URL: &url.URL{
+					Scheme: "https",
+					Host:   "api.parse.com",
+					Path:   "/1/classes/Foo/Bar",
+				},
+				Params: []urlbuild.Param{parse.ParamWhere(map[int]int{})},
+			},
+			Error: `request for URL "https://api.parse.com/1/classes/Foo/Bar" ` +
+				`failed with error for "where" json: unsupported type: map[int]int`,
+		},
+		{
+			Request: &parse.Request{
+				Method: "GET",
+				URL: &url.URL{
+					Scheme: "https",
+					Host:   "api.parse.com",
+					Path:   "/1/classes/Foo/Bar",
+				},
+				Body: map[int]int{},
+			},
+			Error: `GET request for URL "https://api.parse.com/1/classes/Foo/Bar" ` +
+				`failed with error json: unsupported type: map[int]int`,
+		},
 	}
-	req := parse.Request{Method: "GET", URL: &url.URL{}}
-	err := c.Do(&req, nil)
-	if err == nil {
-		t.Fatal("was expecting error")
-	}
-	const msg = `Get : unsupported protocol scheme ""`
-	if actual := err.Error(); actual != msg {
-		t.Fatalf(`expected "%s" got "%s"`, msg, actual)
-	}
-}
 
-func TestUnreachableURL(t *testing.T) {
 	t.Parallel()
-	c := &parse.Client{
-		HttpClient:  httpClient,
-		Credentials: &parse.Credentials{},
-	}
-	u := &url.URL{
-		Scheme: "https",
-		Host:   "www.eadf5cfd365145e99d2a3ddeec5d5f00.com",
-		Path:   "/",
-	}
-	req := parse.Request{Method: "GET", URL: u}
-	err := c.Do(&req, nil)
-	if err == nil {
-		t.Fatal("was expecting error")
-	}
-	const msg = `Get https://www.eadf5cfd365145e99d2a3ddeec5d5f00.com/: lookup www.eadf5cfd365145e99d2a3ddeec5d5f00.com: no such host`
-	if actual := err.Error(); actual != msg {
-		t.Fatalf(`expected "%s" got "%s"`, msg, actual)
+	for _, ec := range cases {
+		err := defaultParseClient.Do(ec.Request, nil)
+		if err == nil {
+			t.Fatal("was expecting error")
+		}
+		if actual := err.Error(); actual != ec.Error {
+			t.Fatalf(`expected "%s" got "%s"`, ec.Error, actual)
+		}
 	}
 }
 
 func TestInvalidUnauthorizedRequest(t *testing.T) {
 	t.Parallel()
 	c := &parse.Client{
-		HttpClient:  httpClient,
 		Credentials: &parse.Credentials{},
+		HttpClient:  defaultHttpClient,
 	}
 	u, err := parse.DefaultBaseURL.Parse("classes/Foo/Bar")
 	if err != nil {
@@ -172,7 +237,8 @@ func TestInvalidUnauthorizedRequest(t *testing.T) {
 	if err == nil {
 		t.Fatal("was expecting error")
 	}
-	const msg = `GET request for URL https://api.parse.com/1/classes/Foo/Bar failed with http status 401 Unauthorized and message unauthorized`
+	const msg = `GET request for URL https://api.parse.com/1/classes/Foo/Bar ` +
+		`failed with http status 401 Unauthorized and message unauthorized`
 	if actual := err.Error(); actual != msg {
 		t.Fatalf(`expected "%s" got "%s"`, msg, actual)
 	}
@@ -185,7 +251,7 @@ func TestRedact(t *testing.T) {
 			JavaScriptKey: "js-key",
 			MasterKey:     "ms-key",
 		},
-		HttpClient: httpClient,
+		HttpClient: defaultHttpClient,
 	}
 	p := "/_JavaScriptKey=js-key&_MasterKey=ms-key"
 	u := &url.URL{
@@ -199,7 +265,11 @@ func TestRedact(t *testing.T) {
 	if err == nil {
 		t.Fatal("was expecting error")
 	}
-	msg := fmt.Sprintf(`Get https://www.eadf5cfd365145e99d2a3ddeec5d5f00.com%s: lookup www.eadf5cfd365145e99d2a3ddeec5d5f00.com: no such host`, p)
+	msg := fmt.Sprintf(
+		`Get https://www.eadf5cfd365145e99d2a3ddeec5d5f00.com%s: `+
+			`lookup www.eadf5cfd365145e99d2a3ddeec5d5f00.com: no such host`,
+		p,
+	)
 	if actual := err.Error(); actual != msg {
 		t.Fatalf(`expected "%s" got "%s"`, msg, actual)
 	}
@@ -209,27 +279,12 @@ func TestRedact(t *testing.T) {
 	if err == nil {
 		t.Fatal("was expecting error")
 	}
-	const redacted = `Get https://www.eadf5cfd365145e99d2a3ddeec5d5f00.com/_JavaScriptKey=-- REDACTED JAVASCRIPT KEY --&_MasterKey=-- REDACTED MASTER KEY --: lookup www.eadf5cfd365145e99d2a3ddeec5d5f00.com: no such host`
+	const redacted = `Get ` +
+		`https://www.eadf5cfd365145e99d2a3ddeec5d5f00.com/_JavaScriptKey=-- ` +
+		`REDACTED JAVASCRIPT KEY --&_MasterKey=-- REDACTED MASTER KEY --: ` +
+		`lookup www.eadf5cfd365145e99d2a3ddeec5d5f00.com: no such host`
 	if actual := err.Error(); actual != redacted {
 		t.Fatalf(`expected "%s" got "%s"`, redacted, actual)
-	}
-}
-
-func TestInvalidGetRequest(t *testing.T) {
-	t.Parallel()
-	u, err := parse.DefaultBaseURL.Parse("classes/Foo/Bar")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	req := parse.Request{Method: "GET", URL: u}
-	err = defaultTestClient.Do(&req, nil)
-	if err == nil {
-		t.Fatal("was expecting error")
-	}
-	const msg = `GET request for URL https://api.parse.com/1/classes/Foo/Bar failed with code 101 and message object not found for get`
-	if actual := err.Error(); actual != msg {
-		t.Fatalf(`expected "%s" got "%s"`, msg, actual)
 	}
 }
 
@@ -247,7 +302,7 @@ func TestPostDeleteObject(t *testing.T) {
 	oPost := &obj{Answer: 42}
 	oPostResponse := &parse.Object{}
 	oPostReq := parse.Request{Method: "POST", URL: oPostURL, Body: oPost}
-	err = defaultTestClient.Do(&oPostReq, oPostResponse)
+	err = defaultParseClient.Do(&oPostReq, oPostResponse)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -263,16 +318,20 @@ func TestPostDeleteObject(t *testing.T) {
 
 	oGet := &obj{}
 	oGetReq := parse.Request{Method: "GET", URL: oGetURL}
-	err = defaultTestClient.Do(&oGetReq, oGet)
+	err = defaultParseClient.Do(&oGetReq, oGet)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if oGet.Answer != oPost.Answer {
-		t.Fatalf("did not get expected answer %d instead got %d", oPost.Answer, oGet.Answer)
+		t.Fatalf(
+			"did not get expected answer %d instead got %d",
+			oPost.Answer,
+			oGet.Answer,
+		)
 	}
 
 	oDelReq := parse.Request{Method: "DELETE", URL: oGetURL}
-	err = defaultTestClient.Do(&oDelReq, nil)
+	err = defaultParseClient.Do(&oDelReq, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -285,13 +344,15 @@ func TestPostDeleteObjectUsingObjectClass(t *testing.T) {
 		Answer int `json:"answer"`
 	}
 
-	u, err := parse.DefaultBaseURL.Parse("classes/TestPostDeleteObjectUsingObjectClass/")
+	u, err := parse.DefaultBaseURL.Parse(
+		"classes/TestPostDeleteObjectUsingObjectClass/",
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	foo := &parse.ObjectClient{
-		Client:  defaultTestClient,
+		Client:  defaultParseClient,
 		BaseURL: u,
 	}
 
@@ -310,94 +371,14 @@ func TestPostDeleteObjectUsingObjectClass(t *testing.T) {
 		t.Fatal(err)
 	}
 	if oGet.Answer != oPost.Answer {
-		t.Fatalf("did not get expected answer %d instead got %d", oPost.Answer, oGet.Answer)
+		t.Fatalf(
+			"did not get expected answer %d instead got %d",
+			oPost.Answer,
+			oGet.Answer,
+		)
 	}
 
 	if err := foo.Delete(oGet.ID); err != nil {
 		t.Fatal(err)
-	}
-}
-
-func TestCannotSpecifyParamsInPath(t *testing.T) {
-	t.Parallel()
-	u, err := parse.DefaultBaseURL.Parse("classes/Foo/Bar?a=1")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	req := parse.Request{Method: "GET", URL: u}
-	err = defaultTestClient.Do(&req, nil)
-	if err == nil {
-		t.Fatal("was expecting error")
-	}
-	const msg = `request for URL "https://api.parse.com/1/classes/Foo/Bar?a=1" failed with error URL cannot include query, use Params instead`
-	if actual := err.Error(); actual != msg {
-		t.Fatalf(`expected "%s" got "%s"`, msg, actual)
-	}
-}
-
-func TestInvalidGetRequestWithParams(t *testing.T) {
-	t.Parallel()
-	u, err := parse.DefaultBaseURL.Parse("classes/Foo/Bar")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	req := parse.Request{
-		Method: "GET",
-		URL:    u,
-		Params: []urlbuild.Param{parse.ParamLimit(0)},
-	}
-	err = defaultTestClient.Do(&req, nil)
-	if err == nil {
-		t.Fatal("was expecting error")
-	}
-	const msg = `GET request for URL https://api.parse.com/1/classes/Foo/Bar?limit=0 failed with code 101 and message object not found for get`
-	if actual := err.Error(); actual != msg {
-		t.Fatalf(`expected "%s" got "%s"`, msg, actual)
-	}
-}
-
-func TestInvalidWhereParam(t *testing.T) {
-	t.Parallel()
-	u, err := parse.DefaultBaseURL.Parse("classes/Foo/Bar")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	req := parse.Request{
-		Method: "GET",
-		URL:    u,
-		Params: []urlbuild.Param{parse.ParamWhere(map[int]int{})},
-	}
-	err = defaultTestClient.Do(&req, nil)
-	if err == nil {
-		t.Fatal("was expecting error")
-	}
-	const msg = `request for URL "https://api.parse.com/1/classes/Foo/Bar" failed with error for "where" json: unsupported type: map[int]int`
-	if actual := err.Error(); actual != msg {
-		t.Fatalf(`expected "%s" got "%s"`, msg, actual)
-	}
-}
-
-func TestInvalidBody(t *testing.T) {
-	t.Parallel()
-	u, err := parse.DefaultBaseURL.Parse("classes/Foo/Bar")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	req := parse.Request{
-		Method: "GET",
-		URL:    u,
-		Body:   map[int]int{},
-	}
-	err = defaultTestClient.Do(&req, nil)
-	if err == nil {
-		t.Fatal("was expecting error")
-	}
-	const msg = `GET request for URL "https://api.parse.com/1/classes/Foo/Bar" failed with error json: unsupported type: map[int]int`
-	if actual := err.Error(); actual != msg {
-		t.Fatalf(`expected "%s" got "%s"`, msg, actual)
 	}
 }

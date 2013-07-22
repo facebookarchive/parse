@@ -17,8 +17,11 @@ import (
 	"github.com/daaku/go.urlbuild"
 )
 
-var errURLCannotIncludeQuery = errors.New(
-	"URL cannot include query, use Params instead")
+var (
+	errURLCannotIncludeQuery = errors.New(
+		"URL cannot include query, use Params instead")
+	errNoURLGiven = errors.New("no URL provided")
+)
 
 // An Object Identifier.
 type ID string
@@ -287,6 +290,10 @@ type Request struct {
 
 // Make a http.Request out of this Request for the given Client.
 func (r *Request) toHttpRequest(c *Client) (*http.Request, error) {
+	if r.URL == nil {
+		return nil, errNoURLGiven
+	}
+
 	if r.URL.RawQuery != "" {
 		return nil, &internalError{
 			url:    r.URL,
