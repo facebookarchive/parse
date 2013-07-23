@@ -322,8 +322,8 @@ func (r *Request) toHttpRequest(c *Client) (*http.Request, error) {
 		ProtoMinor: 1,
 		Host:       r.URL.Host,
 		Header: http.Header{
-			"X-Parse-Application-Id": []string{string(c.Credentials.ApplicationID)},
-			"X-Parse-REST-API-Key":   []string{c.Credentials.RestApiKey},
+			"X-Parse-Application-Id": {string(c.Credentials.ApplicationID)},
+			"X-Parse-REST-API-Key":   {c.Credentials.RestApiKey},
 		},
 	}
 
