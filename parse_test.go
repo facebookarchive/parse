@@ -1,9 +1,11 @@
 package parse_test
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"testing"
 	"time"
@@ -421,5 +423,55 @@ func TestRelativeGetWithDefaultBaseURL(t *testing.T) {
 			expected,
 			err,
 		)
+	}
+}
+
+func TestServerAbortWith200(t *testing.T) {
+	t.Parallel()
+	statusCodes := []int{200, 500}
+
+	for _, code := range statusCodes {
+		var server *httptest.Server
+		server = httptest.NewServer(
+			http.HandlerFunc(
+				func(w http.ResponseWriter, r *http.Request) {
+					w.Header().Add("Content-Length", "4000")
+					w.WriteHeader(code)
+					w.Write(bytes.Repeat([]byte("a"), 3000))
+				},
+			),
+		)
+		defer server.CloseClientConnections()
+		defer server.Close()
+
+		u, err := url.Parse(server.URL)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		c := &parse.Client{
+			Credentials: defaultCredentials,
+			HttpClient:  defaultHttpClient,
+			BaseURL:     u,
+		}
+		_, err = c.Get(nil, nil)
+		if err == nil {
+			t.Fatal("was expecting an error")
+		}
+		expected := fmt.Sprintf(
+			`GET request for URL "%s" failed with error unexpected EOF http status `+
+				`%d %s (%d)`,
+			server.URL,
+			code,
+			http.StatusText(code),
+			code,
+		)
+		if err.Error() != expected {
+			t.Fatalf(
+				`did not get expected error "%s" instead got "%s"`,
+				expected,
+				err,
+			)
+		}
 	}
 }
