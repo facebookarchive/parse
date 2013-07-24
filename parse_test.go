@@ -428,12 +428,28 @@ func TestRelativeGetWithDefaultBaseURL(t *testing.T) {
 
 func TestServerAbort(t *testing.T) {
 	t.Parallel()
-	for _, code := range []int{200, 500} {
+	cases := []struct {
+		Code  int
+		Error string
+	}{
+		{
+			Code: 200,
+			Error: `GET request for URL "%s" failed with error invalid character ` +
+				`'a' looking for beginning of value http status 200 OK (200)`,
+		},
+		{
+			Code: 500,
+			Error: `GET request for URL "%s" failed with error unexpected EOF http ` +
+				`status 500 Internal Server Error (500)`,
+		},
+	}
+
+	for _, ca := range cases {
 		server := httptest.NewServer(
 			http.HandlerFunc(
 				func(w http.ResponseWriter, r *http.Request) {
 					w.Header().Add("Content-Length", "4000")
-					w.WriteHeader(code)
+					w.WriteHeader(ca.Code)
 					w.Write(bytes.Repeat([]byte("a"), 3000))
 				},
 			),
@@ -449,18 +465,12 @@ func TestServerAbort(t *testing.T) {
 			HttpClient:  defaultHttpClient,
 			BaseURL:     u,
 		}
-		_, err = c.Get(nil, nil)
+		res := make(map[string]interface{})
+		_, err = c.Get(nil, res)
 		if err == nil {
-			t.Fatal("was expecting an error")
+			t.Fatalf("was expecting an error instead got %v", res)
 		}
-		expected := fmt.Sprintf(
-			`GET request for URL "%s" failed with error unexpected EOF http status `+
-				`%d %s (%d)`,
-			server.URL,
-			code,
-			http.StatusText(code),
-			code,
-		)
+		expected := fmt.Sprintf(ca.Error, server.URL)
 		if err.Error() != expected {
 			t.Fatalf(
 				`did not get expected error "%s" instead got "%s"`,
