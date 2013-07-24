@@ -4,7 +4,6 @@ package parse
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -14,8 +13,6 @@ import (
 	"strings"
 	"time"
 )
-
-var errNoURLGiven = errors.New("no URL provided")
 
 // An Object Identifier.
 type ID string
@@ -308,11 +305,19 @@ func (c *Client) Delete(u *url.URL, result interface{}) (*http.Response, error) 
 // Method helper.
 func (c *Client) method(method string, u *url.URL, body, result interface{}) (*http.Response, error) {
 	if u == nil {
-		return nil, errNoURLGiven
-	}
-
-	if !u.IsAbs() {
-		u = c.BaseURL.ResolveReference(u)
+		if c.BaseURL == nil {
+			u = DefaultBaseURL
+		} else {
+			u = c.BaseURL
+		}
+	} else {
+		if !u.IsAbs() {
+			if c.BaseURL == nil {
+				u = DefaultBaseURL.ResolveReference(u)
+			} else {
+				u = c.BaseURL.ResolveReference(u)
+			}
+		}
 	}
 
 	req := &http.Request{

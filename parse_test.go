@@ -296,3 +296,59 @@ func TestPostDeleteObject(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestMethodHelpers(t *testing.T) {
+	t.Parallel()
+
+	c := &parse.Client{
+		Credentials: defaultCredentials,
+		HttpClient:  defaultHttpClient,
+		BaseURL: &url.URL{
+			Scheme: "https",
+			Host:   "api.parse.com",
+			Path:   "/1/classes/Foo/",
+		},
+	}
+
+	type obj struct {
+		Answer int `json:"answer"`
+	}
+
+	oPost := &obj{Answer: 42}
+	oPostResponse := &parse.Object{}
+	_, err := c.Post(nil, oPost, oPostResponse)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if oPostResponse.ID == "" {
+		t.Fatal("did not get an ID in the response")
+	}
+
+	oURL := &url.URL{Path: string(oPostResponse.ID)}
+
+	res, err := c.Head(oURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.StatusCode != 200 {
+		t.Fatalf("did not get expected status 200 instead got %d", res.StatusCode)
+	}
+
+	oGet := &obj{}
+	_, err = c.Get(oURL, oGet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if oGet.Answer != oPost.Answer {
+		t.Fatalf(
+			"did not get expected answer %d instead got %d",
+			oPost.Answer,
+			oGet.Answer,
+		)
+	}
+
+	_, err = c.Delete(oURL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
