@@ -379,3 +379,25 @@ func TestMethodHelpers(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestNilGetWithDefaultBaseURL(t *testing.T) {
+	t.Parallel()
+	c := &parse.Client{
+		Credentials: defaultCredentials,
+		HttpClient:  defaultHttpClient,
+	}
+	_, err := c.Get(nil, nil)
+	if err == nil {
+		t.Fatal("was expecting an error")
+	}
+	const expected = `GET request for URL "https://api.parse.com/1/" failed ` +
+		`with error invalid character '<' looking for beginning of value http ` +
+		`status 404 Not Found (404)`
+	if err.Error() != expected {
+		t.Fatalf(
+			`did not get expected error "%s" instead got "%s"`,
+			expected,
+			err,
+		)
+	}
+}
