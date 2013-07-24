@@ -1,4 +1,4 @@
-// Package parse provides a server SDK for the parse.com API.
+// Package parse provides a client for the Parse API.
 package parse
 
 import (
