@@ -209,9 +209,6 @@ func (e *redactError) Error() string {
 
 // An internal error during request processing.
 type internalError struct {
-	// Contains the URL if request is unavailable.
-	url *url.URL
-
 	// May contain the *http.Request.
 	request *http.Request
 
@@ -226,16 +223,12 @@ type internalError struct {
 
 func (e *internalError) Error() string {
 	var buf bytes.Buffer
-	if e.request == nil {
-		fmt.Fprintf(&buf, `request for URL "%s"`, e.url)
-	} else {
-		fmt.Fprintf(
-			&buf,
-			`%s request for URL "%s"`,
-			e.request.Method,
-			redactIf(e.client, e.request.URL.String()),
-		)
-	}
+	fmt.Fprintf(
+		&buf,
+		`%s request for URL "%s"`,
+		e.request.Method,
+		redactIf(e.client, e.request.URL.String()),
+	)
 
 	fmt.Fprintf(
 		&buf,
@@ -352,7 +345,6 @@ func (c *Client) Transport(req *http.Request, body, result interface{}) (*http.R
 		if err != nil {
 			return nil, &internalError{
 				request: req,
-				url:     req.URL,
 				actual:  err,
 				client:  c,
 			}
