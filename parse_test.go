@@ -17,7 +17,7 @@ import (
 var (
 	defaultHttpTransport = &httpcontrol.Transport{
 		MaxIdleConnsPerHost:   50,
-		DialTimeout:           time.Second,
+		DialTimeout:           3 * time.Second,
 		ResponseHeaderTimeout: 30 * time.Second,
 		RequestTimeout:        time.Minute,
 		Stats:                 logRequestHandler,
