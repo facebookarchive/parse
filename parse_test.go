@@ -347,6 +347,24 @@ func TestMethodHelpers(t *testing.T) {
 		)
 	}
 
+	oPut := &obj{Answer: 43}
+	_, err = c.Put(oURL, oPut, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = c.Get(oURL, oGet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if oGet.Answer != oPut.Answer {
+		t.Fatalf(
+			"did not get expected answer %d instead got %d",
+			oPut.Answer,
+			oGet.Answer,
+		)
+	}
+
 	_, err = c.Delete(oURL, nil)
 	if err != nil {
 		t.Fatal(err)
