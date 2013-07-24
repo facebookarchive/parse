@@ -426,13 +426,10 @@ func TestRelativeGetWithDefaultBaseURL(t *testing.T) {
 	}
 }
 
-func TestServerAbortWith200(t *testing.T) {
+func TestServerAbort(t *testing.T) {
 	t.Parallel()
-	statusCodes := []int{200, 500}
-
-	for _, code := range statusCodes {
-		var server *httptest.Server
-		server = httptest.NewServer(
+	for _, code := range []int{200, 500} {
+		server := httptest.NewServer(
 			http.HandlerFunc(
 				func(w http.ResponseWriter, r *http.Request) {
 					w.Header().Add("Content-Length", "4000")
@@ -441,8 +438,6 @@ func TestServerAbortWith200(t *testing.T) {
 				},
 			),
 		)
-		defer server.CloseClientConnections()
-		defer server.Close()
 
 		u, err := url.Parse(server.URL)
 		if err != nil {
@@ -473,5 +468,7 @@ func TestServerAbortWith200(t *testing.T) {
 				err,
 			)
 		}
+		server.CloseClientConnections()
+		server.Close()
 	}
 }
