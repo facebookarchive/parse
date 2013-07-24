@@ -168,6 +168,15 @@ func TestErrorCases(t *testing.T) {
 			Error: `GET request for URL "https://api.parse.com/1/classes/Foo/Bar" ` +
 				`failed with error json: unsupported type: map[int]int`,
 		},
+		{
+			Request: &http.Request{
+				Method: "GET",
+				URL:    parse.DefaultBaseURL,
+			},
+			Error: `GET request for URL "https://api.parse.com/1/" failed with ` +
+				`error invalid character '<' looking for beginning of value http ` +
+				`status 404 Not Found (404)`,
+		},
 	}
 
 	t.Parallel()

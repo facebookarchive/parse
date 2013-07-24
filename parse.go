@@ -179,16 +179,8 @@ func (e *Error) Error() string {
 		fmt.Fprintf(&buf, " http status %s", e.response.Status)
 	}
 
-	fmt.Fprint(&buf, " and")
 	if e.Message != "" {
-		fmt.Fprintf(&buf, " message %s", redactIf(e.client, e.Message))
-	} else {
-		body, _ := ioutil.ReadAll(e.request.Body)
-		if len(body) > 0 {
-			fmt.Fprintf(&buf, " body %s", redactIf(e.client, string(body)))
-		} else {
-			fmt.Fprint(&buf, " no body")
-		}
+		fmt.Fprintf(&buf, " and message %s", redactIf(e.client, e.Message))
 	}
 
 	return buf.String()
@@ -240,14 +232,6 @@ func (e *internalError) Error() string {
 			e.response.Status,
 			e.response.StatusCode,
 		)
-
-		fmt.Fprint(&buf, " and")
-		body, _ := ioutil.ReadAll(e.request.Body)
-		if len(body) > 0 {
-			fmt.Fprintf(&buf, " body %s", body)
-		} else {
-			fmt.Fprint(&buf, " no body")
-		}
 	}
 
 	return buf.String()
@@ -378,7 +362,6 @@ func (c *Client) Transport(req *http.Request, body, result interface{}) (*http.R
 			}
 		}
 
-		res.Body = ioutil.NopCloser(bytes.NewBuffer(body))
 		apiErr := &Error{
 			request:  req,
 			response: res,
