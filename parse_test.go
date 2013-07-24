@@ -12,7 +12,6 @@ import (
 	"github.com/daaku/go.flagenv"
 	"github.com/daaku/go.httpcontrol"
 	"github.com/daaku/go.parse"
-	"github.com/daaku/go.urlbuild"
 )
 
 var (
@@ -120,19 +119,20 @@ func TestACL(t *testing.T) {
 
 func TestErrorCases(t *testing.T) {
 	cases := []struct {
-		Request *parse.Request
+		Request *http.Request
+		Body    interface{}
 		Error   string
 	}{
 		{
-			Request: &parse.Request{Method: "GET"},
-			Error:   `no URL provided`,
+			Request: &http.Request{Method: "GET"},
+			Error:   `http: nil Request.URL`,
 		},
 		{
-			Request: &parse.Request{Method: "GET", URL: &url.URL{}},
+			Request: &http.Request{Method: "GET", URL: &url.URL{}},
 			Error:   `Get : unsupported protocol scheme ""`,
 		},
 		{
-			Request: &parse.Request{
+			Request: &http.Request{
 				Method: "GET",
 				URL: &url.URL{
 					Scheme: "https",
@@ -144,7 +144,7 @@ func TestErrorCases(t *testing.T) {
 				`lookup www.eadf5cfd365145e99d2a3ddeec5d5f00.com: no such host`,
 		},
 		{
-			Request: &parse.Request{
+			Request: &http.Request{
 				Method: "GET",
 				URL: &url.URL{
 					Scheme: "https",
@@ -156,55 +156,15 @@ func TestErrorCases(t *testing.T) {
 				`failed with code 101 and message object not found for get`,
 		},
 		{
-			Request: &parse.Request{
-				Method: "GET",
-				URL: &url.URL{
-					Scheme:   "https",
-					Host:     "api.parse.com",
-					Path:     "/1/classes/Foo/Bar",
-					RawQuery: "a=1",
-				},
-			},
-			Error: `request for URL "https://api.parse.com/1/classes/Foo/Bar?a=1" ` +
-				`failed with error URL cannot include query, use Params instead`,
-		},
-		{
-			Request: &parse.Request{
+			Request: &http.Request{
 				Method: "GET",
 				URL: &url.URL{
 					Scheme: "https",
 					Host:   "api.parse.com",
 					Path:   "/1/classes/Foo/Bar",
 				},
-				Params: []urlbuild.Param{parse.ParamLimit(0)},
 			},
-			Error: `GET request for URL ` +
-				`https://api.parse.com/1/classes/Foo/Bar?limit=0 ` +
-				`failed with code 101 and message object not found for get`,
-		},
-		{
-			Request: &parse.Request{
-				Method: "GET",
-				URL: &url.URL{
-					Scheme: "https",
-					Host:   "api.parse.com",
-					Path:   "/1/classes/Foo/Bar",
-				},
-				Params: []urlbuild.Param{parse.ParamWhere(map[int]int{})},
-			},
-			Error: `request for URL "https://api.parse.com/1/classes/Foo/Bar" ` +
-				`failed with error for "where" json: unsupported type: map[int]int`,
-		},
-		{
-			Request: &parse.Request{
-				Method: "GET",
-				URL: &url.URL{
-					Scheme: "https",
-					Host:   "api.parse.com",
-					Path:   "/1/classes/Foo/Bar",
-				},
-				Body: map[int]int{},
-			},
+			Body: map[int]int{},
 			Error: `GET request for URL "https://api.parse.com/1/classes/Foo/Bar" ` +
 				`failed with error json: unsupported type: map[int]int`,
 		},
@@ -212,7 +172,7 @@ func TestErrorCases(t *testing.T) {
 
 	t.Parallel()
 	for _, ec := range cases {
-		err := defaultParseClient.Do(ec.Request, nil)
+		_, err := defaultParseClient.Transport(ec.Request, ec.Body, nil)
 		if err == nil {
 			t.Fatal("was expecting error")
 		}
@@ -232,8 +192,8 @@ func TestInvalidUnauthorizedRequest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	req := parse.Request{Method: "GET", URL: u}
-	err = c.Do(&req, nil)
+	req := http.Request{Method: "GET", URL: u}
+	_, err = c.Transport(&req, nil, nil)
 	if err == nil {
 		t.Fatal("was expecting error")
 	}
@@ -260,8 +220,8 @@ func TestRedact(t *testing.T) {
 		Path:   p,
 	}
 
-	req := parse.Request{Method: "GET", URL: u}
-	err := c.Do(&req, nil)
+	req := http.Request{Method: "GET", URL: u}
+	_, err := c.Transport(&req, nil, nil)
 	if err == nil {
 		t.Fatal("was expecting error")
 	}
@@ -275,7 +235,7 @@ func TestRedact(t *testing.T) {
 	}
 
 	c.Redact = true
-	err = c.Do(&req, nil)
+	_, err = c.Transport(&req, nil, nil)
 	if err == nil {
 		t.Fatal("was expecting error")
 	}
@@ -301,8 +261,8 @@ func TestPostDeleteObject(t *testing.T) {
 
 	oPost := &obj{Answer: 42}
 	oPostResponse := &parse.Object{}
-	oPostReq := parse.Request{Method: "POST", URL: oPostURL, Body: oPost}
-	err = defaultParseClient.Do(&oPostReq, oPostResponse)
+	oPostReq := http.Request{Method: "POST", URL: oPostURL}
+	_, err = defaultParseClient.Transport(&oPostReq, oPost, oPostResponse)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -317,8 +277,8 @@ func TestPostDeleteObject(t *testing.T) {
 	}
 
 	oGet := &obj{}
-	oGetReq := parse.Request{Method: "GET", URL: oGetURL}
-	err = defaultParseClient.Do(&oGetReq, oGet)
+	oGetReq := http.Request{Method: "GET", URL: oGetURL}
+	_, err = defaultParseClient.Transport(&oGetReq, nil, oGet)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -330,55 +290,9 @@ func TestPostDeleteObject(t *testing.T) {
 		)
 	}
 
-	oDelReq := parse.Request{Method: "DELETE", URL: oGetURL}
-	err = defaultParseClient.Do(&oDelReq, nil)
+	oDelReq := http.Request{Method: "DELETE", URL: oGetURL}
+	_, err = defaultParseClient.Transport(&oDelReq, nil, nil)
 	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestPostDeleteObjectUsingObjectClass(t *testing.T) {
-	t.Parallel()
-	type obj struct {
-		parse.Object
-		Answer int `json:"answer"`
-	}
-
-	u, err := parse.DefaultBaseURL.Parse(
-		"classes/TestPostDeleteObjectUsingObjectClass/",
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	foo := &parse.ObjectClient{
-		Client:  defaultParseClient,
-		BaseURL: u,
-	}
-
-	oPost := &obj{Answer: 42}
-	oPostResponse, err := foo.Post(oPost)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if oPostResponse.ID == "" {
-		t.Fatal("did not get an ID in the response")
-	}
-
-	oGet := &obj{}
-	err = foo.Get(oPostResponse.ID, oGet)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if oGet.Answer != oPost.Answer {
-		t.Fatalf(
-			"did not get expected answer %d instead got %d",
-			oPost.Answer,
-			oGet.Answer,
-		)
-	}
-
-	if err := foo.Delete(oGet.ID); err != nil {
 		t.Fatal(err)
 	}
 }

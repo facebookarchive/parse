@@ -13,15 +13,9 @@ import (
 	"net/url"
 	"strings"
 	"time"
-
-	"github.com/daaku/go.urlbuild"
 )
 
-var (
-	errURLCannotIncludeQuery = errors.New(
-		"URL cannot include query, use Params instead")
-	errNoURLGiven = errors.New("no URL provided")
-)
+var errNoURLGiven = errors.New("no URL provided")
 
 // An Object Identifier.
 type ID string
@@ -281,59 +275,84 @@ var DefaultBaseURL = &url.URL{
 	Path:   "/1/",
 }
 
-type Request struct {
-	Method string
-	URL    *url.URL
-	Params []urlbuild.Param
-	Body   interface{}
+// Parse API Client.
+type Client struct {
+	Credentials *Credentials
+	BaseURL     *url.URL
+	HttpClient  HttpClient
+	Redact      bool // Redact sensitive information from errors when true
 }
 
-// Make a http.Request out of this Request for the given Client.
-func (r *Request) toHttpRequest(c *Client) (*http.Request, error) {
-	if r.URL == nil {
+// Perform a HEAD method call on the given url.
+func (c *Client) Head(u *url.URL) (*http.Response, error) {
+	return c.method("HEAD", u, nil, nil)
+}
+
+// Perform a GET method call on the given url and unmarshal response into
+// result.
+func (c *Client) Get(u *url.URL, result interface{}) (*http.Response, error) {
+	return c.method("GET", u, nil, result)
+}
+
+// Perform a POST method call on the given url with the given body and
+// unmarshal response into result.
+func (c *Client) Post(u *url.URL, body, result interface{}) (*http.Response, error) {
+	return c.method("POST", u, body, result)
+}
+
+// Perform a PUT method call on the given url with the given body and
+// unmarshal response into result.
+func (c *Client) Put(u *url.URL, body, result interface{}) (*http.Response, error) {
+	return c.method("PUT", u, body, result)
+}
+
+// Perform a DELETE method call on the given url and unmarshal response into
+// result.
+func (c *Client) Delete(u *url.URL, result interface{}) (*http.Response, error) {
+	return c.method("DELETE", u, nil, result)
+}
+
+// Method helper.
+func (c *Client) method(method string, u *url.URL, body, result interface{}) (*http.Response, error) {
+	if u == nil {
 		return nil, errNoURLGiven
 	}
 
-	if r.URL.RawQuery != "" {
-		return nil, &internalError{
-			url:    r.URL,
-			actual: errURLCannotIncludeQuery,
-			client: c,
-		}
-	}
-
-	if len(r.Params) != 0 {
-		val, err := urlbuild.MakeValues(r.Params)
-		if err != nil {
-			return nil, &internalError{
-				url:    r.URL,
-				actual: err,
-				client: c,
-			}
-		}
-		r.URL.RawQuery = val.Encode()
+	if !u.IsAbs() {
+		u = c.BaseURL.ResolveReference(u)
 	}
 
 	req := &http.Request{
-		Method:     r.Method,
-		URL:        r.URL,
+		Method:     method,
+		URL:        u,
 		Proto:      "HTTP/1.1",
 		ProtoMajor: 1,
 		ProtoMinor: 1,
-		Host:       r.URL.Host,
-		Header: http.Header{
-			"X-Parse-Application-Id": {string(c.Credentials.ApplicationID)},
-			"X-Parse-REST-API-Key":   {c.Credentials.RestApiKey},
-		},
+		Host:       u.Host,
+		Header:     make(http.Header),
 	}
 
+	return c.Transport(req, body, result)
+}
+
+// Perform a Parse API call. This method modifies the request and adds the
+// Authentication headers. The body is JSON encoded and for responses in the
+// 2xx or 3xx range the response will be unmarshalled into result, for others
+// an error of type Error will be returned.
+func (c *Client) Transport(req *http.Request, body, result interface{}) (*http.Response, error) {
+	if req.Header == nil {
+		req.Header = make(http.Header)
+	}
+	req.Header.Add("X-Parse-Application-Id", string(c.Credentials.ApplicationID))
+	req.Header.Add("X-Parse-REST-API-Key", c.Credentials.RestApiKey)
+
 	// we need to buffer as Parse requires a Content-Length
-	if r.Body != nil {
-		bd, err := json.Marshal(r.Body)
+	if body != nil {
+		bd, err := json.Marshal(body)
 		if err != nil {
 			return nil, &internalError{
 				request: req,
-				url:     r.URL,
+				url:     req.URL,
 				actual:  err,
 				client:  c,
 			}
@@ -342,38 +361,9 @@ func (r *Request) toHttpRequest(c *Client) (*http.Request, error) {
 		req.ContentLength = int64(len(bd))
 	}
 
-	return req, nil
-}
-
-// Parse API Client.
-type Client struct {
-	Credentials *Credentials
-	HttpClient  HttpClient
-	Redact      bool // Redact sensitive information from errors when true
-}
-
-// Perform a Parse API call. For responses in the 2xx or 3xx range the response
-// will be unmarshalled into result, for others an error of type Error will be
-// returned. The value will be JSON marshalled and sent as the request body.
-func (c *Client) Do(req *Request, result interface{}) error {
-	hr, err := req.toHttpRequest(c)
-	if err != nil {
-		return err
-	}
-
-	err = c.Transport(hr, result)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Transport makes a request and unmarshalls the JSON into result.
-func (c *Client) Transport(req *http.Request, result interface{}) error {
 	res, err := c.HttpClient.Do(req)
 	if err != nil {
-		return &redactError{
+		return nil, &redactError{
 			actual: err,
 			client: c,
 		}
@@ -383,7 +373,7 @@ func (c *Client) Transport(req *http.Request, result interface{}) error {
 	if res.StatusCode > 399 || res.StatusCode < 200 {
 		body, err := ioutil.ReadAll(res.Body)
 		if err != nil {
-			return &internalError{
+			return res, &internalError{
 				request:  req,
 				response: res,
 				actual:   err,
@@ -399,14 +389,14 @@ func (c *Client) Transport(req *http.Request, result interface{}) error {
 		}
 		err = json.Unmarshal(body, apiErr)
 		if err != nil {
-			return &internalError{
+			return res, &internalError{
 				request:  req,
 				response: res,
 				actual:   err,
 				client:   c,
 			}
 		}
-		return apiErr
+		return res, apiErr
 	}
 
 	if result == nil {
@@ -415,53 +405,12 @@ func (c *Client) Transport(req *http.Request, result interface{}) error {
 		err = json.NewDecoder(res.Body).Decode(result)
 	}
 	if err != nil {
-		return &internalError{
+		return res, &internalError{
 			request:  req,
 			response: res,
 			actual:   err,
 			client:   c,
 		}
 	}
-	return nil
-}
-
-// Provides access relative to a given BaseURL. This is useful to access by
-// Class Name or known built-ins like Users.
-type ObjectClient struct {
-	Client  *Client
-	BaseURL *url.URL
-}
-
-// Post a new instance with the given initial value.
-func (o *ObjectClient) Post(v interface{}) (*Object, error) {
-	res := new(Object)
-	req := Request{
-		Method: "POST",
-		URL:    o.BaseURL,
-		Body:   v,
-	}
-	if err := o.Client.Do(&req, res); err != nil {
-		return nil, err
-	}
 	return res, nil
-}
-
-// Delete the instance specified by id.
-func (o *ObjectClient) Delete(id ID) error {
-	u, err := o.BaseURL.Parse(string(id))
-	if err != nil {
-		return err
-	}
-	req := Request{Method: "DELETE", URL: u}
-	return o.Client.Do(&req, nil)
-}
-
-// Get an existing instance specified by id.
-func (o *ObjectClient) Get(id ID, result interface{}) error {
-	u, err := o.BaseURL.Parse(string(id))
-	if err != nil {
-		return err
-	}
-	req := Request{Method: "GET", URL: u}
-	return o.Client.Do(&req, result)
 }
