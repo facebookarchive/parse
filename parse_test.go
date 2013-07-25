@@ -184,7 +184,7 @@ func TestErrorCases(t *testing.T) {
 
 	t.Parallel()
 	for _, ec := range cases {
-		_, err := defaultParseClient.Transport(ec.Request, ec.Body, nil)
+		_, err := defaultParseClient.Do(ec.Request, ec.Body, nil)
 		if err == nil {
 			t.Fatal("was expecting error")
 		}
@@ -205,7 +205,7 @@ func TestInvalidUnauthorizedRequest(t *testing.T) {
 		t.Fatal(err)
 	}
 	req := http.Request{Method: "GET", URL: u}
-	_, err = c.Transport(&req, nil, nil)
+	_, err = c.Do(&req, nil, nil)
 	if err == nil {
 		t.Fatal("was expecting error")
 	}
@@ -233,7 +233,7 @@ func TestRedact(t *testing.T) {
 	}
 
 	req := http.Request{Method: "GET", URL: u}
-	_, err := c.Transport(&req, nil, nil)
+	_, err := c.Do(&req, nil, nil)
 	if err == nil {
 		t.Fatal("was expecting error")
 	}
@@ -247,7 +247,7 @@ func TestRedact(t *testing.T) {
 	}
 
 	c.Redact = true
-	_, err = c.Transport(&req, nil, nil)
+	_, err = c.Do(&req, nil, nil)
 	if err == nil {
 		t.Fatal("was expecting error")
 	}
@@ -274,7 +274,7 @@ func TestPostDeleteObject(t *testing.T) {
 	oPost := &obj{Answer: 42}
 	oPostResponse := &parse.Object{}
 	oPostReq := http.Request{Method: "POST", URL: oPostURL}
-	_, err = defaultParseClient.Transport(&oPostReq, oPost, oPostResponse)
+	_, err = defaultParseClient.Do(&oPostReq, oPost, oPostResponse)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -290,7 +290,7 @@ func TestPostDeleteObject(t *testing.T) {
 
 	oGet := &obj{}
 	oGetReq := http.Request{Method: "GET", URL: oGetURL}
-	_, err = defaultParseClient.Transport(&oGetReq, nil, oGet)
+	_, err = defaultParseClient.Do(&oGetReq, nil, oGet)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -303,7 +303,7 @@ func TestPostDeleteObject(t *testing.T) {
 	}
 
 	oDelReq := http.Request{Method: "DELETE", URL: oGetURL}
-	_, err = defaultParseClient.Transport(&oDelReq, nil, nil)
+	_, err = defaultParseClient.Do(&oDelReq, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

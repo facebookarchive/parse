@@ -312,14 +312,14 @@ func (c *Client) method(method string, u *url.URL, body, result interface{}) (*h
 		Header:     make(http.Header),
 	}
 
-	return c.Transport(req, body, result)
+	return c.Do(req, body, result)
 }
 
 // Perform a Parse API call. This method modifies the request and adds the
 // Authentication headers. The body is JSON encoded and for responses in the
 // 2xx or 3xx range the response will be JSON decoded into result, for others
 // an error of type Error will be returned.
-func (c *Client) Transport(req *http.Request, body, result interface{}) (*http.Response, error) {
+func (c *Client) Do(req *http.Request, body, result interface{}) (*http.Response, error) {
 	if req.Header == nil {
 		req.Header = make(http.Header)
 	}
