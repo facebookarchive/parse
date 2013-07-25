@@ -20,17 +20,22 @@ type ID string
 // Credentials to access an application.
 type Credentials struct {
 	ApplicationID ID
+	ClientKey     string
 	JavaScriptKey string
-	MasterKey     string
+	WindowsKey    string
 	RestApiKey    string
+	MasterKey     string
 }
 
 // Credentials configured via flags. For example, if name is "parse", it will
 // provide:
 //
 //     -parse.application-id=abc123
-//     -parse.javascript-key=def456
-//     -parse.master-key=ghi789
+//     -parse.client-key=abc123
+//     -parse.javascript-key=abc123
+//     -parse.windows-key=abc123
+//     -parse.rest-api-key=abc123
+//     -parse.master-key=abc123
 func CredentialsFlag(name string) *Credentials {
 	credentials := &Credentials{}
 	flag.StringVar(
@@ -40,22 +45,34 @@ func CredentialsFlag(name string) *Credentials {
 		name+" Application ID",
 	)
 	flag.StringVar(
+		&credentials.ClientKey,
+		name+".client-key",
+		"",
+		name+" Client Key",
+	)
+	flag.StringVar(
 		&credentials.JavaScriptKey,
 		name+".javascript-key",
 		"",
 		name+" JavaScript Key",
 	)
 	flag.StringVar(
-		&credentials.MasterKey,
-		name+".master-key",
+		&credentials.WindowsKey,
+		name+".windows-key",
 		"",
-		name+" Master Key",
+		name+" Windows Key",
 	)
 	flag.StringVar(
 		&credentials.RestApiKey,
 		name+".rest-api-key",
 		"",
 		name+" REST API Key",
+	)
+	flag.StringVar(
+		&credentials.MasterKey,
+		name+".master-key",
+		"",
+		name+" Master Key",
 	)
 	return credentials
 }
@@ -132,19 +149,9 @@ type User struct {
 
 // Redact known sensitive information.
 func redactIf(c *Client, s string) string {
-	if c.Redact {
-		var args []string
-		if c.Credentials.JavaScriptKey != "" {
-			args = append(
-				args,
-				c.Credentials.JavaScriptKey,
-				"-- REDACTED JAVASCRIPT KEY --",
-			)
-		}
-		if c.Credentials.MasterKey != "" {
-			args = append(args, c.Credentials.MasterKey, "-- REDACTED MASTER KEY --")
-		}
-		return strings.NewReplacer(args...).Replace(s)
+	if c.Redact && c.Credentials.MasterKey != "" {
+		const redacted = "-- REDACTED MASTER KEY --"
+		return strings.Replace(s, c.Credentials.MasterKey, redacted, -1)
 	}
 	return s
 }
@@ -158,7 +165,7 @@ type Error struct {
 	// Always contains the *http.Request.
 	request *http.Request `json:"-"`
 
-	// May contain the *http.Response including a readable Body.
+	// May contain the *http.Response.
 	response *http.Response `json:"-"`
 
 	client *Client `json:"-"`

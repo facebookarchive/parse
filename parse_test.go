@@ -252,8 +252,8 @@ func TestRedact(t *testing.T) {
 		t.Fatal("was expecting error")
 	}
 	const redacted = `Get ` +
-		`https://www.eadf5cfd365145e99d2a3ddeec5d5f00.com/_JavaScriptKey=-- ` +
-		`REDACTED JAVASCRIPT KEY --&_MasterKey=-- REDACTED MASTER KEY --: ` +
+		`https://www.eadf5cfd365145e99d2a3ddeec5d5f00.com/_JavaScriptKey=js-key` +
+		`&_MasterKey=-- REDACTED MASTER KEY --: ` +
 		`lookup www.eadf5cfd365145e99d2a3ddeec5d5f00.com: no such host`
 	if actual := err.Error(); actual != redacted {
 		t.Fatalf(`expected "%s" got "%s"`, redacted, actual)
