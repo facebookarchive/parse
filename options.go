@@ -9,12 +9,12 @@ import (
 
 // Params are defined by the Parse API and include things like limit/skip etc.
 type Param interface {
-	set(v url.Values) error
+	Set(v url.Values) error
 }
 
 type paramInclude []string
 
-func (p paramInclude) set(v url.Values) error {
+func (p paramInclude) Set(v url.Values) error {
 	if len(p) != 0 {
 		v.Add("include", strings.Join(p, ","))
 	}
@@ -28,7 +28,7 @@ func ParamInclude(include []string) Param {
 
 type paramOrder string
 
-func (p paramOrder) set(v url.Values) error {
+func (p paramOrder) Set(v url.Values) error {
 	if p != "" {
 		v.Add("order", string(p))
 	}
@@ -42,7 +42,7 @@ func ParamOrder(order string) Param {
 
 type paramLimit uint64
 
-func (p paramLimit) set(v url.Values) error {
+func (p paramLimit) Set(v url.Values) error {
 	v.Add("limit", strconv.FormatUint(uint64(p), 10))
 	return nil
 }
@@ -54,7 +54,7 @@ func ParamLimit(limit uint64) Param {
 
 type paramCount bool
 
-func (p paramCount) set(v url.Values) error {
+func (p paramCount) Set(v url.Values) error {
 	if p {
 		v.Add("count", "1")
 	}
@@ -68,7 +68,7 @@ func ParamCount(include bool) Param {
 
 type paramSkip uint64
 
-func (p paramSkip) set(v url.Values) error {
+func (p paramSkip) Set(v url.Values) error {
 	if p != 0 {
 		v.Add("skip", strconv.FormatUint(uint64(p), 10))
 	}
@@ -82,7 +82,7 @@ func ParamSkip(skip uint64) Param {
 
 type paramKeys []string
 
-func (p paramKeys) set(v url.Values) error {
+func (p paramKeys) Set(v url.Values) error {
 	if len(p) != 0 {
 		v.Add("keys", strings.Join(p, ","))
 	}
@@ -98,7 +98,7 @@ type paramWhere struct {
 	Value interface{}
 }
 
-func (p *paramWhere) set(v url.Values) error {
+func (p *paramWhere) Set(v url.Values) error {
 	b, err := json.Marshal(p.Value)
 	if err != nil {
 		return err
@@ -116,7 +116,7 @@ func ParamWhere(v interface{}) Param {
 func ParamValues(params ...Param) (v url.Values, err error) {
 	v = make(url.Values)
 	for _, p := range params {
-		err = p.set(v)
+		err = p.Set(v)
 		if err != nil {
 			return nil, err
 		}
