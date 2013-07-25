@@ -147,15 +147,6 @@ type User struct {
 	} `json:"authData,omitempty"`
 }
 
-// Redact known sensitive information.
-func redactIf(c *Client, s string) string {
-	if c.Redact && c.Credentials.MasterKey != "" {
-		const redacted = "-- REDACTED MASTER KEY --"
-		return strings.Replace(s, c.Credentials.MasterKey, redacted, -1)
-	}
-	return s
-}
-
 // An Error from the Parse API.
 type Error struct {
 	// These are provided by the Parse API and may not always be available.
@@ -177,7 +168,7 @@ func (e *Error) Error() string {
 		&buf,
 		"%s request for URL %s failed with",
 		e.request.Method,
-		redactIf(e.client, e.request.URL.String()),
+		e.client.redactIf(e.request.URL.String()),
 	)
 
 	if e.Code != 0 {
@@ -187,7 +178,7 @@ func (e *Error) Error() string {
 	}
 
 	if e.Message != "" {
-		fmt.Fprintf(&buf, " and message %s", redactIf(e.client, e.Message))
+		fmt.Fprintf(&buf, " and message %s", e.client.redactIf(e.Message))
 	}
 
 	return buf.String()
@@ -200,7 +191,7 @@ type redactError struct {
 }
 
 func (e *redactError) Error() string {
-	return redactIf(e.client, e.actual.Error())
+	return e.client.redactIf(e.actual.Error())
 }
 
 // An internal error during request processing.
@@ -223,13 +214,13 @@ func (e *internalError) Error() string {
 		&buf,
 		`%s request for URL "%s"`,
 		e.request.Method,
-		redactIf(e.client, e.request.URL.String()),
+		e.client.redactIf(e.request.URL.String()),
 	)
 
 	fmt.Fprintf(
 		&buf,
 		" failed with error %s",
-		redactIf(e.client, e.actual.Error()),
+		e.client.redactIf(e.actual.Error()),
 	)
 
 	if e.response != nil {
@@ -326,7 +317,7 @@ func (c *Client) method(method string, u *url.URL, body, result interface{}) (*h
 
 // Perform a Parse API call. This method modifies the request and adds the
 // Authentication headers. The body is JSON encoded and for responses in the
-// 2xx or 3xx range the response will be unmarshalled into result, for others
+// 2xx or 3xx range the response will be JSON decoded into result, for others
 // an error of type Error will be returned.
 func (c *Client) Transport(req *http.Request, body, result interface{}) (*http.Response, error) {
 	if req.Header == nil {
@@ -400,4 +391,13 @@ func (c *Client) Transport(req *http.Request, body, result interface{}) (*http.R
 		}
 	}
 	return res, nil
+}
+
+// Redact sensitive information from given string.
+func (c *Client) redactIf(s string) string {
+	if c.Redact && c.Credentials.MasterKey != "" {
+		const redacted = "-- REDACTED MASTER KEY --"
+		return strings.Replace(s, c.Credentials.MasterKey, redacted, -1)
+	}
+	return s
 }
