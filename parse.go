@@ -4,14 +4,16 @@ package parse
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
+
+	"github.com/daaku/go.httperr"
 )
 
 // An Object Identifier.
@@ -153,86 +155,28 @@ type Error struct {
 	Message string `json:"error"`
 	Code    int    `json:"code"`
 
-	// Always contains the *http.Request.
-	request *http.Request `json:"-"`
-
-	// May contain the *http.Response.
-	response *http.Response `json:"-"`
-
-	client *Client `json:"-"`
+	request  *http.Request
+	response *http.Response
+	client   *Client
 }
 
 func (e *Error) Error() string {
 	var buf bytes.Buffer
-	fmt.Fprintf(
-		&buf,
-		"%s request for URL %s failed with",
-		e.request.Method,
-		e.client.redactIf(e.request.URL.String()),
-	)
-
 	if e.Code != 0 {
-		fmt.Fprintf(&buf, " code %d", e.Code)
-	} else if e.response != nil {
-		fmt.Fprintf(&buf, " http status %s", e.response.Status)
+		fmt.Fprintf(&buf, "code %d", e.Code)
 	}
-
+	if e.Code != 0 && e.Message != "" {
+		fmt.Fprint(&buf, " and ")
+	}
 	if e.Message != "" {
-		fmt.Fprintf(&buf, " and message %s", e.client.redactIf(e.Message))
+		fmt.Fprintf(&buf, "message %s", e.Message)
 	}
-
-	return buf.String()
-}
-
-// Redacts sensitive information from an existing error.
-type redactError struct {
-	actual error
-	client *Client
-}
-
-func (e *redactError) Error() string {
-	return e.client.redactIf(e.actual.Error())
-}
-
-// An internal error during request processing.
-type internalError struct {
-	// May contain the *http.Request.
-	request *http.Request
-
-	// May contain the *http.Response including a readable Body.
-	response *http.Response
-
-	// The actual error.
-	actual error
-
-	client *Client
-}
-
-func (e *internalError) Error() string {
-	var buf bytes.Buffer
-	fmt.Fprintf(
-		&buf,
-		`%s request for URL "%s"`,
-		e.request.Method,
-		e.client.redactIf(e.request.URL.String()),
-	)
-
-	fmt.Fprintf(
-		&buf,
-		" failed with error %s",
-		e.client.redactIf(e.actual.Error()),
-	)
-
-	if e.response != nil {
-		fmt.Fprintf(
-			&buf,
-			" http status %s (%d)",
-			e.response.Status,
-			e.response.StatusCode,
-		)
-	}
-
-	return buf.String()
+	return httperr.NewError(
+		errors.New(buf.String()),
+		e.client.redact(),
+		e.request,
+		e.response,
+	).Error()
 }
 
 // The underlying Http Client.
@@ -323,11 +267,7 @@ func (c *Client) Do(req *http.Request, body, result interface{}) (*http.Response
 	if body != nil {
 		bd, err := json.Marshal(body)
 		if err != nil {
-			return nil, &internalError{
-				request: req,
-				actual:  err,
-				client:  c,
-			}
+			return nil, httperr.NewError(err, c.redact(), req, nil)
 		}
 		req.Body = ioutil.NopCloser(bytes.NewReader(bd))
 		req.ContentLength = int64(len(bd))
@@ -335,22 +275,14 @@ func (c *Client) Do(req *http.Request, body, result interface{}) (*http.Response
 
 	res, err := c.HttpClient.Do(req)
 	if err != nil {
-		return nil, &redactError{
-			actual: err,
-			client: c,
-		}
+		return nil, httperr.RedactError(err, c.redact())
 	}
 	defer res.Body.Close()
 
 	if res.StatusCode > 399 || res.StatusCode < 200 {
 		body, err := ioutil.ReadAll(res.Body)
 		if err != nil {
-			return res, &internalError{
-				request:  req,
-				response: res,
-				actual:   err,
-				client:   c,
-			}
+			return nil, httperr.NewError(err, c.redact(), req, res)
 		}
 
 		apiErr := &Error{
@@ -360,12 +292,7 @@ func (c *Client) Do(req *http.Request, body, result interface{}) (*http.Response
 		}
 		err = json.Unmarshal(body, apiErr)
 		if err != nil {
-			return res, &internalError{
-				request:  req,
-				response: res,
-				actual:   err,
-				client:   c,
-			}
+			return nil, httperr.NewError(err, c.redact(), req, res)
 		}
 		return res, apiErr
 	}
@@ -376,21 +303,15 @@ func (c *Client) Do(req *http.Request, body, result interface{}) (*http.Response
 		err = json.NewDecoder(res.Body).Decode(result)
 	}
 	if err != nil {
-		return res, &internalError{
-			request:  req,
-			response: res,
-			actual:   err,
-			client:   c,
-		}
+		return nil, httperr.NewError(err, c.redact(), req, res)
 	}
 	return res, nil
 }
 
 // Redact sensitive information from given string.
-func (c *Client) redactIf(s string) string {
-	if c.Redact && c.Credentials.MasterKey != "" {
-		const redacted = "-- REDACTED MASTER KEY --"
-		return strings.Replace(s, c.Credentials.MasterKey, redacted, -1)
+func (c *Client) redact() httperr.Redactor {
+	if !c.Redact || c.Credentials.MasterKey == "" {
+		return httperr.RedactNoOp()
 	}
-	return s
+	return httperr.RedactString(c.Credentials.MasterKey, "-- REDACTED MASTER KEY --")
 }

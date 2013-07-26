@@ -147,8 +147,8 @@ func TestErrorCases(t *testing.T) {
 					Path:   "/1/classes/Foo/Bar",
 				},
 			},
-			Error: `GET request for URL https://api.parse.com/1/classes/Foo/Bar ` +
-				`failed with code 101 and message object not found for get`,
+			Error: `GET https://api.parse.com/1/classes/Foo/Bar got 404 Not Found` +
+				` failed with code 101 and message object not found for get`,
 		},
 		{
 			Request: &http.Request{
@@ -160,17 +160,16 @@ func TestErrorCases(t *testing.T) {
 				},
 			},
 			Body: map[int]int{},
-			Error: `GET request for URL "https://api.parse.com/1/classes/Foo/Bar" ` +
-				`failed with error json: unsupported type: map[int]int`,
+			Error: `GET https://api.parse.com/1/classes/Foo/Bar failed with json:` +
+				` unsupported type: map[int]int`,
 		},
 		{
 			Request: &http.Request{
 				Method: "GET",
 				URL:    parse.DefaultBaseURL,
 			},
-			Error: `GET request for URL "https://api.parse.com/1/" failed with ` +
-				`error invalid character '<' looking for beginning of value http ` +
-				`status 404 Not Found (404)`,
+			Error: `GET https://api.parse.com/1/ got 404 Not Found failed with` +
+				` invalid character '<' looking for beginning of value`,
 		},
 	}
 
@@ -178,10 +177,10 @@ func TestErrorCases(t *testing.T) {
 	for _, ec := range cases {
 		_, err := defaultParseClient.Do(ec.Request, ec.Body, nil)
 		if err == nil {
-			t.Fatal("was expecting error")
+			t.Error("was expecting error")
 		}
 		if actual := err.Error(); actual != ec.Error {
-			t.Fatalf(`expected "%s" got "%s"`, ec.Error, actual)
+			t.Errorf(`expected "%s" got "%s"`, ec.Error, actual)
 		}
 	}
 }
@@ -201,8 +200,8 @@ func TestInvalidUnauthorizedRequest(t *testing.T) {
 	if err == nil {
 		t.Fatal("was expecting error")
 	}
-	const msg = `GET request for URL https://api.parse.com/1/classes/Foo/Bar ` +
-		`failed with http status 401 Unauthorized and message unauthorized`
+	const msg = `GET https://api.parse.com/1/classes/Foo/Bar got 401 ` +
+		`Unauthorized failed with message unauthorized`
 	if actual := err.Error(); actual != msg {
 		t.Fatalf(`expected "%s" got "%s"`, msg, actual)
 	}
@@ -385,9 +384,8 @@ func TestNilGetWithDefaultBaseURL(t *testing.T) {
 	if err == nil {
 		t.Fatal("was expecting an error")
 	}
-	const expected = `GET request for URL "https://api.parse.com/1/" failed ` +
-		`with error invalid character '<' looking for beginning of value http ` +
-		`status 404 Not Found (404)`
+	const expected = `GET https://api.parse.com/1/ got 404 Not Found failed ` +
+		`with invalid character '<' looking for beginning of value`
 	if err.Error() != expected {
 		t.Fatalf(
 			`did not get expected error "%s" instead got "%s"`,
@@ -407,9 +405,8 @@ func TestRelativeGetWithDefaultBaseURL(t *testing.T) {
 	if err == nil {
 		t.Fatal("was expecting an error")
 	}
-	const expected = `GET request for URL "https://api.parse.com/1/Foo" failed ` +
-		`with error invalid character '<' looking for beginning of value http ` +
-		`status 404 Not Found (404)`
+	const expected = `GET https://api.parse.com/1/Foo got 404 Not Found failed` +
+		` with invalid character '<' looking for beginning of value`
 	if err.Error() != expected {
 		t.Fatalf(
 			`did not get expected error "%s" instead got "%s"`,
@@ -447,10 +444,7 @@ func TestServerAbort(t *testing.T) {
 		if err == nil {
 			t.Fatalf("was expecting an error instead got %v", res)
 		}
-		expected := fmt.Sprintf(
-			`GET request for URL "%s" failed with error`,
-			server.URL,
-		)
+		expected := fmt.Sprintf(`GET %s`, server.URL)
 		if !strings.Contains(err.Error(), expected) {
 			t.Fatalf(
 				`did not contain expected error "%s" instead got "%s"`,
