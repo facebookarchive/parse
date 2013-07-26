@@ -127,14 +127,6 @@ func TestErrorCases(t *testing.T) {
 		Error   string
 	}{
 		{
-			Request: &http.Request{Method: "GET"},
-			Error:   `http: nil Request.URL`,
-		},
-		{
-			Request: &http.Request{Method: "GET", URL: &url.URL{}},
-			Error:   `Get : unsupported protocol scheme ""`,
-		},
-		{
 			Request: &http.Request{
 				Method: "GET",
 				URL: &url.URL{

@@ -257,62 +257,31 @@ type Client struct {
 
 // Perform a HEAD method call on the given url.
 func (c *Client) Head(u *url.URL) (*http.Response, error) {
-	return c.method("HEAD", u, nil, nil)
+	return c.Do(&http.Request{Method: "HEAD", URL: u}, nil, nil)
 }
 
 // Perform a GET method call on the given url and unmarshal response into
 // result.
 func (c *Client) Get(u *url.URL, result interface{}) (*http.Response, error) {
-	return c.method("GET", u, nil, result)
+	return c.Do(&http.Request{Method: "GET", URL: u}, nil, result)
 }
 
 // Perform a POST method call on the given url with the given body and
 // unmarshal response into result.
 func (c *Client) Post(u *url.URL, body, result interface{}) (*http.Response, error) {
-	return c.method("POST", u, body, result)
+	return c.Do(&http.Request{Method: "POST", URL: u}, body, result)
 }
 
 // Perform a PUT method call on the given url with the given body and
 // unmarshal response into result.
 func (c *Client) Put(u *url.URL, body, result interface{}) (*http.Response, error) {
-	return c.method("PUT", u, body, result)
+	return c.Do(&http.Request{Method: "PUT", URL: u}, body, result)
 }
 
 // Perform a DELETE method call on the given url and unmarshal response into
 // result.
 func (c *Client) Delete(u *url.URL, result interface{}) (*http.Response, error) {
-	return c.method("DELETE", u, nil, result)
-}
-
-// Method helper.
-func (c *Client) method(method string, u *url.URL, body, result interface{}) (*http.Response, error) {
-	if u == nil {
-		if c.BaseURL == nil {
-			u = DefaultBaseURL
-		} else {
-			u = c.BaseURL
-		}
-	} else {
-		if !u.IsAbs() {
-			if c.BaseURL == nil {
-				u = DefaultBaseURL.ResolveReference(u)
-			} else {
-				u = c.BaseURL.ResolveReference(u)
-			}
-		}
-	}
-
-	req := &http.Request{
-		Method:     method,
-		URL:        u,
-		Proto:      "HTTP/1.1",
-		ProtoMajor: 1,
-		ProtoMinor: 1,
-		Host:       u.Host,
-		Header:     make(http.Header),
-	}
-
-	return c.Do(req, body, result)
+	return c.Do(&http.Request{Method: "DELETE", URL: u}, nil, result)
 }
 
 // Perform a Parse API call. This method modifies the request and adds the
@@ -320,6 +289,30 @@ func (c *Client) method(method string, u *url.URL, body, result interface{}) (*h
 // 2xx or 3xx range the response will be JSON decoded into result, for others
 // an error of type Error will be returned.
 func (c *Client) Do(req *http.Request, body, result interface{}) (*http.Response, error) {
+	req.Proto = "HTTP/1.1"
+	req.ProtoMajor = 1
+	req.ProtoMinor = 1
+
+	if req.URL == nil {
+		if c.BaseURL == nil {
+			req.URL = DefaultBaseURL
+		} else {
+			req.URL = c.BaseURL
+		}
+	} else {
+		if !req.URL.IsAbs() {
+			if c.BaseURL == nil {
+				req.URL = DefaultBaseURL.ResolveReference(req.URL)
+			} else {
+				req.URL = c.BaseURL.ResolveReference(req.URL)
+			}
+		}
+	}
+
+	if req.Host == "" {
+		req.Host = req.URL.Host
+	}
+
 	if req.Header == nil {
 		req.Header = make(http.Header)
 	}
