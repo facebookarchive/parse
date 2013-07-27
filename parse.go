@@ -276,14 +276,14 @@ func (c *Client) Do(req *http.Request, body, result interface{}) (*http.Response
 
 	res, err := c.HttpClient.Do(req)
 	if err != nil {
-		return nil, httperr.RedactError(err, c.redactor())
+		return res, httperr.RedactError(err, c.redactor())
 	}
 	defer res.Body.Close()
 
 	if res.StatusCode > 399 || res.StatusCode < 200 {
 		body, err := ioutil.ReadAll(res.Body)
 		if err != nil {
-			return nil, httperr.NewError(err, c.redactor(), req, res)
+			return res, httperr.NewError(err, c.redactor(), req, res)
 		}
 
 		apiErr := &Error{
@@ -293,7 +293,7 @@ func (c *Client) Do(req *http.Request, body, result interface{}) (*http.Response
 		}
 		err = json.Unmarshal(body, apiErr)
 		if err != nil {
-			return nil, httperr.NewError(err, c.redactor(), req, res)
+			return res, httperr.NewError(err, c.redactor(), req, res)
 		}
 		return res, apiErr
 	}
@@ -304,7 +304,7 @@ func (c *Client) Do(req *http.Request, body, result interface{}) (*http.Response
 		err = json.NewDecoder(res.Body).Decode(result)
 	}
 	if err != nil {
-		return nil, httperr.NewError(err, c.redactor(), req, res)
+		return res, httperr.NewError(err, c.redactor(), req, res)
 	}
 	return res, nil
 }

@@ -122,9 +122,10 @@ func TestACL(t *testing.T) {
 
 func TestErrorCases(t *testing.T) {
 	cases := []struct {
-		Request *http.Request
-		Body    interface{}
-		Error   string
+		Request    *http.Request
+		Body       interface{}
+		Error      string
+		StatusCode int
 	}{
 		{
 			Request: &http.Request{
@@ -149,6 +150,7 @@ func TestErrorCases(t *testing.T) {
 			},
 			Error: `GET https://api.parse.com/1/classes/Foo/Bar got 404 Not Found` +
 				` failed with code 101 and message object not found for get`,
+			StatusCode: 404,
 		},
 		{
 			Request: &http.Request{
@@ -170,17 +172,26 @@ func TestErrorCases(t *testing.T) {
 			},
 			Error: `GET https://api.parse.com/1/ got 404 Not Found failed with` +
 				` invalid character '<' looking for beginning of value`,
+			StatusCode: 404,
 		},
 	}
 
 	t.Parallel()
 	for _, ec := range cases {
-		_, err := defaultParseClient.Do(ec.Request, ec.Body, nil)
+		res, err := defaultParseClient.Do(ec.Request, ec.Body, nil)
 		if err == nil {
 			t.Error("was expecting error")
 		}
 		if actual := err.Error(); actual != ec.Error {
 			t.Errorf(`expected "%s" got "%s"`, ec.Error, actual)
+		}
+		if ec.StatusCode != 0 {
+			if res == nil {
+				t.Error("did not get expected http.Response")
+			}
+			if res.StatusCode != ec.StatusCode {
+				t.Errorf(`expected %d got %d`, ec.StatusCode, res.StatusCode)
+			}
 		}
 	}
 }
