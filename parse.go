@@ -173,7 +173,7 @@ func (e *Error) Error() string {
 	}
 	return httperr.NewError(
 		errors.New(buf.String()),
-		e.client.redact(),
+		e.client.redactor(),
 		e.request,
 		e.response,
 	).Error()
@@ -267,7 +267,7 @@ func (c *Client) Do(req *http.Request, body, result interface{}) (*http.Response
 	if body != nil {
 		bd, err := json.Marshal(body)
 		if err != nil {
-			return nil, httperr.NewError(err, c.redact(), req, nil)
+			return nil, httperr.NewError(err, c.redactor(), req, nil)
 		}
 		req.Body = ioutil.NopCloser(bytes.NewReader(bd))
 		req.ContentLength = int64(len(bd))
@@ -275,14 +275,14 @@ func (c *Client) Do(req *http.Request, body, result interface{}) (*http.Response
 
 	res, err := c.HttpClient.Do(req)
 	if err != nil {
-		return nil, httperr.RedactError(err, c.redact())
+		return nil, httperr.RedactError(err, c.redactor())
 	}
 	defer res.Body.Close()
 
 	if res.StatusCode > 399 || res.StatusCode < 200 {
 		body, err := ioutil.ReadAll(res.Body)
 		if err != nil {
-			return nil, httperr.NewError(err, c.redact(), req, res)
+			return nil, httperr.NewError(err, c.redactor(), req, res)
 		}
 
 		apiErr := &Error{
@@ -292,7 +292,7 @@ func (c *Client) Do(req *http.Request, body, result interface{}) (*http.Response
 		}
 		err = json.Unmarshal(body, apiErr)
 		if err != nil {
-			return nil, httperr.NewError(err, c.redact(), req, res)
+			return nil, httperr.NewError(err, c.redactor(), req, res)
 		}
 		return res, apiErr
 	}
@@ -303,13 +303,13 @@ func (c *Client) Do(req *http.Request, body, result interface{}) (*http.Response
 		err = json.NewDecoder(res.Body).Decode(result)
 	}
 	if err != nil {
-		return nil, httperr.NewError(err, c.redact(), req, res)
+		return nil, httperr.NewError(err, c.redactor(), req, res)
 	}
 	return res, nil
 }
 
 // Redact sensitive information from given string.
-func (c *Client) redact() httperr.Redactor {
+func (c *Client) redactor() httperr.Redactor {
 	if !c.Redact || c.Credentials.MasterKey == "" {
 		return httperr.RedactNoOp()
 	}
