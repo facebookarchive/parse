@@ -25,11 +25,10 @@ var (
 		RequestTimeout:        time.Minute,
 		Stats:                 logRequestHandler,
 	}
-	defaultHttpClient  = &http.Client{Transport: defaultHttpTransport}
 	defaultCredentials = parse.CredentialsFlag("parsetest")
 	defaultParseClient = &parse.Client{
 		Credentials: defaultCredentials,
-		HttpClient:  defaultHttpClient,
+		Transport:   defaultHttpTransport,
 	}
 
 	logRequest = flag.Bool(
@@ -136,8 +135,9 @@ func TestErrorCases(t *testing.T) {
 					Path:   "/",
 				},
 			},
-			Error: `Get https://www.eadf5cfd365145e99d2a3ddeec5d5f00.com/: ` +
-				`lookup www.eadf5cfd365145e99d2a3ddeec5d5f00.com: no such host`,
+			Error: `GET https://www.eadf5cfd365145e99d2a3ddeec5d5f00.com/ ` +
+				`failed with lookup www.eadf5cfd365145e99d2a3ddeec5d5f00.com: no ` +
+				`such host`,
 		},
 		{
 			Request: &http.Request{
@@ -200,7 +200,7 @@ func TestInvalidUnauthorizedRequest(t *testing.T) {
 	t.Parallel()
 	c := &parse.Client{
 		Credentials: &parse.Credentials{},
-		HttpClient:  defaultHttpClient,
+		Transport:   defaultHttpTransport,
 	}
 	u, err := parse.DefaultBaseURL.Parse("classes/Foo/Bar")
 	if err != nil {
@@ -225,7 +225,7 @@ func TestRedact(t *testing.T) {
 			JavaScriptKey: "js-key",
 			MasterKey:     "ms-key",
 		},
-		HttpClient: defaultHttpClient,
+		Transport: defaultHttpTransport,
 	}
 	p := "/_JavaScriptKey=js-key&_MasterKey=ms-key"
 	u := &url.URL{
@@ -240,7 +240,7 @@ func TestRedact(t *testing.T) {
 		t.Fatal("was expecting error")
 	}
 	msg := fmt.Sprintf(
-		`Get https://www.eadf5cfd365145e99d2a3ddeec5d5f00.com%s: `+
+		`GET https://www.eadf5cfd365145e99d2a3ddeec5d5f00.com%s failed with `+
 			`lookup www.eadf5cfd365145e99d2a3ddeec5d5f00.com: no such host`,
 		p,
 	)
@@ -253,9 +253,9 @@ func TestRedact(t *testing.T) {
 	if err == nil {
 		t.Fatal("was expecting error")
 	}
-	const redacted = `Get ` +
+	const redacted = `GET ` +
 		`https://www.eadf5cfd365145e99d2a3ddeec5d5f00.com/_JavaScriptKey=js-key` +
-		`&_MasterKey=-- REDACTED MASTER KEY --: ` +
+		`&_MasterKey=-- REDACTED MASTER KEY -- failed with ` +
 		`lookup www.eadf5cfd365145e99d2a3ddeec5d5f00.com: no such host`
 	if actual := err.Error(); actual != redacted {
 		t.Fatalf(`expected "%s" got "%s"`, redacted, actual)
@@ -316,7 +316,7 @@ func TestMethodHelpers(t *testing.T) {
 
 	c := &parse.Client{
 		Credentials: defaultCredentials,
-		HttpClient:  defaultHttpClient,
+		Transport:   defaultHttpTransport,
 		BaseURL: &url.URL{
 			Scheme: "https",
 			Host:   "api.parse.com",
@@ -389,7 +389,7 @@ func TestNilGetWithDefaultBaseURL(t *testing.T) {
 	t.Parallel()
 	c := &parse.Client{
 		Credentials: defaultCredentials,
-		HttpClient:  defaultHttpClient,
+		Transport:   defaultHttpTransport,
 	}
 	_, err := c.Get(nil, nil)
 	if err == nil {
@@ -410,7 +410,7 @@ func TestRelativeGetWithDefaultBaseURL(t *testing.T) {
 	t.Parallel()
 	c := &parse.Client{
 		Credentials: defaultCredentials,
-		HttpClient:  defaultHttpClient,
+		Transport:   defaultHttpTransport,
 	}
 	_, err := c.Get(&url.URL{Path: "Foo"}, nil)
 	if err == nil {
@@ -447,7 +447,7 @@ func TestServerAbort(t *testing.T) {
 
 		c := &parse.Client{
 			Credentials: defaultCredentials,
-			HttpClient:  defaultHttpClient,
+			Transport:   defaultHttpTransport,
 			BaseURL:     u,
 		}
 		res := make(map[string]interface{})

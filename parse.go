@@ -180,11 +180,6 @@ func (e *Error) Error() string {
 	).Error()
 }
 
-// The underlying Http Client.
-type HttpClient interface {
-	Do(req *http.Request) (*http.Response, error)
-}
-
 // The default base URL for the API.
 var DefaultBaseURL = &url.URL{
 	Scheme: "https",
@@ -196,7 +191,7 @@ var DefaultBaseURL = &url.URL{
 type Client struct {
 	Credentials *Credentials
 	BaseURL     *url.URL
-	HttpClient  HttpClient
+	Transport   http.RoundTripper
 	Redact      bool // Redact sensitive information from errors when true
 }
 
@@ -274,9 +269,9 @@ func (c *Client) Do(req *http.Request, body, result interface{}) (*http.Response
 		req.ContentLength = int64(len(bd))
 	}
 
-	res, err := c.HttpClient.Do(req)
+	res, err := c.Transport.RoundTrip(req)
 	if err != nil {
-		return res, httperr.RedactError(err, c.redactor())
+		return res, httperr.NewError(err, c.redactor(), req, res)
 	}
 	defer res.Body.Close()
 
