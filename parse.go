@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/daaku/go.httperr"
@@ -313,5 +314,5 @@ func (c *Client) redactor() httperr.Redactor {
 	if !c.Redact || c.Credentials.MasterKey == "" {
 		return httperr.RedactNoOp()
 	}
-	return httperr.RedactString(c.Credentials.MasterKey, "-- REDACTED MASTER KEY --")
+	return strings.NewReplacer(c.Credentials.MasterKey, "-- REDACTED MASTER KEY --")
 }
