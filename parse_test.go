@@ -467,3 +467,18 @@ func TestServerAbort(t *testing.T) {
 		server.Close()
 	}
 }
+
+func TestEmptyClient(t *testing.T) {
+	t.Parallel()
+	c := &parse.Client{}
+	req := http.Request{Method: "GET", URL: &url.URL{Path: "classes/Foo/Bar"}}
+	_, err := c.Do(&req, nil, nil)
+	if err == nil {
+		t.Fatal("was expecting error")
+	}
+	const msg = `GET https://api.parse.com/1/classes/Foo/Bar got 401 ` +
+		`Unauthorized failed with message unauthorized`
+	if actual := err.Error(); actual != msg {
+		t.Fatalf(`expected "%s" got "%s"`, msg, actual)
+	}
+}

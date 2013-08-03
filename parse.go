@@ -189,10 +189,27 @@ var DefaultBaseURL = &url.URL{
 
 // Parse API Client.
 type Client struct {
+	// The underlying http.RoundTripper to perform the individual requests. When
+	// nil http.DefaultTransport will be used.
+	Transport http.RoundTripper
+
+	// The base URL to parse relative URLs off. If you pass absolute URLs to the
+	// Do function this is not used. DefaultBaseURL will be used instead if this
+	// is nil.
+	BaseURL *url.URL
+
+	// Application Credentials to be included in the API calls.
 	Credentials *Credentials
-	BaseURL     *url.URL
-	Transport   http.RoundTripper
-	Redact      bool // Redact sensitive information from errors when true
+
+	// Redact sensitive information from errors when true.
+	Redact bool
+}
+
+func (c *Client) transport() http.RoundTripper {
+	if c.Transport == nil {
+		return http.DefaultTransport
+	}
+	return c.Transport
 }
 
 // Perform a HEAD method call on the given url.
@@ -256,8 +273,14 @@ func (c *Client) Do(req *http.Request, body, result interface{}) (*http.Response
 	if req.Header == nil {
 		req.Header = make(http.Header)
 	}
-	req.Header.Add("X-Parse-Application-Id", string(c.Credentials.ApplicationID))
-	req.Header.Add("X-Parse-REST-API-Key", c.Credentials.RestApiKey)
+
+	if c.Credentials != nil {
+		req.Header.Add(
+			"X-Parse-Application-Id",
+			string(c.Credentials.ApplicationID),
+		)
+		req.Header.Add("X-Parse-REST-API-Key", c.Credentials.RestApiKey)
+	}
 
 	// we need to buffer as Parse requires a Content-Length
 	if body != nil {
@@ -269,7 +292,7 @@ func (c *Client) Do(req *http.Request, body, result interface{}) (*http.Response
 		req.ContentLength = int64(len(bd))
 	}
 
-	res, err := c.Transport.RoundTrip(req)
+	res, err := c.transport().RoundTrip(req)
 	if err != nil {
 		return res, httperr.NewError(err, c.redactor(), req, res)
 	}
@@ -306,8 +329,11 @@ func (c *Client) Do(req *http.Request, body, result interface{}) (*http.Response
 
 // Redact sensitive information from given string.
 func (c *Client) redactor() httperr.Redactor {
-	if !c.Redact || c.Credentials.MasterKey == "" {
+	if !c.Redact || c.Credentials == nil || c.Credentials.MasterKey == "" {
 		return httperr.RedactNoOp()
 	}
-	return strings.NewReplacer(c.Credentials.MasterKey, "-- REDACTED MASTER KEY --")
+	return strings.NewReplacer(
+		c.Credentials.MasterKey,
+		"-- REDACTED MASTER KEY --",
+	)
 }
