@@ -193,12 +193,12 @@ type Client struct {
 	// nil http.DefaultTransport will be used.
 	Transport http.RoundTripper
 
-	// The base URL to parse relative URLs off. If you pass absolute URLs to the
-	// Do function this is not used. DefaultBaseURL will be used instead if this
-	// is nil.
+	// The base URL to parse relative URLs off. If you pass absolute URLs to Client
+	// functions they are used as-is. When nil DefaultBaseURL will be used.
 	BaseURL *url.URL
 
-	// Application Credentials to be included in the API calls.
+	// Application Credentials to be included in the API calls. When nil no
+	// Credentials will be included.
 	Credentials *Credentials
 
 	// Redact sensitive information from errors when true.
