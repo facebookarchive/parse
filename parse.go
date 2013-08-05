@@ -132,6 +132,12 @@ type User struct {
 	SessionToken  string `json:"sessionToken,omitempty"`
 
 	AuthData *struct {
+		Facebook *struct {
+			ID          string    `json:"id,omitempty"`
+			AccessToken string    `json:"access_token,omitempty"`
+			Expiration  time.Time `json:"expiration_date,omitempty"`
+		} `json:"facebook,omitempty"`
+
 		Twitter *struct {
 			ID              string `json:"id,omitempty"`
 			ScreenName      string `json:"screen_name,omitempty"`
@@ -140,12 +146,6 @@ type User struct {
 			AuthToken       string `json:"auth_token,omitempty"`
 			AuthTokenSecret string `json:"auth_token_secret,omitempty"`
 		} `json:"twitter,omitempty"`
-
-		Facebook *struct {
-			ID          string    `json:"id,omitempty"`
-			AccessToken string    `json:"access_token,omitempty"`
-			Expiration  time.Time `json:"expiration_date,omitempty"`
-		} `json:"facebook,omitempty"`
 
 		Anonymous *struct {
 			ID string `json:"id,omitempty"`
