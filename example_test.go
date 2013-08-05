@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"time"
 
 	"github.com/daaku/go.parse"
 )
@@ -23,16 +22,10 @@ func Example() {
 	}
 
 	type GameScore struct {
-		ID         string     `json:"objectId,omitempty"`
-		CreatedAt  *time.Time `json:"createdAt,omitempty"`
-		Score      int        `json:"score,omitempty"`
-		PlayerName string     `json:"playerName,omitempty"`
-		CheatMode  bool       `json:"cheatMode,omitempty"`
-	}
-
-	type PostResponse struct {
-		ID        string     `json:"objectId,omitempty"`
-		CreatedAt *time.Time `json:"createdAt,omitempty"`
+		parse.Object
+		Score      int    `json:"score,omitempty"`
+		PlayerName string `json:"playerName,omitempty"`
+		CheatMode  bool   `json:"cheatMode,omitempty"`
 	}
 
 	postObject := GameScore{
@@ -40,7 +33,7 @@ func Example() {
 		PlayerName: "Sean Plott",
 		CheatMode:  false,
 	}
-	var postResponse PostResponse
+	var postResponse parse.Object
 	_, err := client.Post(nil, &postObject, &postResponse)
 	if err != nil {
 		fmt.Println(err)
@@ -49,7 +42,7 @@ func Example() {
 	fmt.Println(postResponse)
 
 	var getResponse GameScore
-	_, err = client.Get(&url.URL{Path: postResponse.ID}, &getResponse)
+	_, err = client.Get(&url.URL{Path: string(postResponse.ID)}, &getResponse)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
