@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/daaku/go.flagconfig"
-	"github.com/daaku/go.flagenv"
-	"github.com/daaku/go.httpcontrol"
+	"github.com/ParsePlatform/go.flagconfig"
+	"github.com/ParsePlatform/go.flagenv"
+	"github.com/ParsePlatform/go.httpcontrol"
 	"github.com/daaku/go.parse"
 )
 
@@ -47,9 +47,6 @@ func init() {
 	flag.Usage = flagconfig.Usage
 	flagconfig.Parse()
 	flagenv.Parse()
-	if err := defaultHttpTransport.Start(); err != nil {
-		panic(err)
-	}
 }
 
 func logRequestHandler(stats *httpcontrol.Stats) {
