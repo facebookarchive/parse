@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/daaku/go.httperr"
+	"github.com/ParsePlatform/go.httperr"
 )
 
 // An Object Identifier.
