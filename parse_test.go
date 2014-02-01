@@ -133,8 +133,8 @@ func TestErrorCases(t *testing.T) {
 				},
 			},
 			Error: `GET https://www.eadf5cfd365145e99d2a3ddeec5d5f00.com/ ` +
-				`failed with lookup www.eadf5cfd365145e99d2a3ddeec5d5f00.com: no ` +
-				`such host`,
+				`failed with dial tcp: lookup ` +
+				`www.eadf5cfd365145e99d2a3ddeec5d5f00.com: no such host`,
 		},
 		{
 			Request: &http.Request{
@@ -180,14 +180,14 @@ func TestErrorCases(t *testing.T) {
 			t.Error("was expecting error")
 		}
 		if actual := err.Error(); actual != ec.Error {
-			t.Errorf(`expected "%s" got "%s"`, ec.Error, actual)
+			t.Errorf("expected\n%s\ngot\n%s", ec.Error, actual)
 		}
 		if ec.StatusCode != 0 {
 			if res == nil {
 				t.Error("did not get expected http.Response")
 			}
 			if res.StatusCode != ec.StatusCode {
-				t.Errorf(`expected %d got %d`, ec.StatusCode, res.StatusCode)
+				t.Errorf("expected %d got %d", ec.StatusCode, res.StatusCode)
 			}
 		}
 	}
@@ -237,12 +237,13 @@ func TestRedact(t *testing.T) {
 		t.Fatal("was expecting error")
 	}
 	msg := fmt.Sprintf(
-		`GET https://www.eadf5cfd365145e99d2a3ddeec5d5f00.com%s failed with `+
-			`lookup www.eadf5cfd365145e99d2a3ddeec5d5f00.com: no such host`,
+		`GET https://www.eadf5cfd365145e99d2a3ddeec5d5f00.com%s failed `+
+			`with dial tcp: lookup www.eadf5cfd365145e99d2a3ddeec5d5f00.com: `+
+			`no such host`,
 		p,
 	)
 	if actual := err.Error(); actual != msg {
-		t.Fatalf(`expected "%s" got "%s"`, msg, actual)
+		t.Fatalf("expected\n%s got\n%s", msg, actual)
 	}
 
 	c.Redact = true
@@ -252,10 +253,10 @@ func TestRedact(t *testing.T) {
 	}
 	const redacted = `GET ` +
 		`https://www.eadf5cfd365145e99d2a3ddeec5d5f00.com/_JavaScriptKey=js-key` +
-		`&_MasterKey=-- REDACTED MASTER KEY -- failed with ` +
+		`&_MasterKey=-- REDACTED MASTER KEY -- failed with dial tcp: ` +
 		`lookup www.eadf5cfd365145e99d2a3ddeec5d5f00.com: no such host`
 	if actual := err.Error(); actual != redacted {
-		t.Fatalf(`expected "%s" got "%s"`, redacted, actual)
+		t.Fatalf("expected\n%s\ngot\n%s", redacted, actual)
 	}
 }
 
@@ -396,7 +397,7 @@ func TestNilGetWithDefaultBaseURL(t *testing.T) {
 		`with invalid character '<' looking for beginning of value`
 	if err.Error() != expected {
 		t.Fatalf(
-			`did not get expected error "%s" instead got "%s"`,
+			"did not get expected error\n%s instead got\n%s",
 			expected,
 			err,
 		)
@@ -417,7 +418,7 @@ func TestRelativeGetWithDefaultBaseURL(t *testing.T) {
 		` with invalid character '<' looking for beginning of value`
 	if err.Error() != expected {
 		t.Fatalf(
-			`did not get expected error "%s" instead got "%s"`,
+			"did not get expected error\n%s instead got\n%s",
 			expected,
 			err,
 		)
