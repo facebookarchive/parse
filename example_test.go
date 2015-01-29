@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/daaku/go.parse"
+	"github.com/facebookgo/parse"
 )
 
 func Example() {

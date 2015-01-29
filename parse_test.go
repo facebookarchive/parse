@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/daaku/go.parse"
+	"github.com/facebookgo/parse"
 )
 
 var (
