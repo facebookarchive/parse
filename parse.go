@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -23,61 +22,8 @@ type ID string
 // Credentials to access an application.
 type Credentials struct {
 	ApplicationID ID
-	ClientKey     string
-	JavaScriptKey string
-	WindowsKey    string
 	RestApiKey    string
 	MasterKey     string
-}
-
-// Credentials configured via flags. For example, if name is "parse", it will
-// provide:
-//
-//     -parse.application-id=abc123
-//     -parse.client-key=abc123
-//     -parse.javascript-key=abc123
-//     -parse.windows-key=abc123
-//     -parse.rest-api-key=abc123
-//     -parse.master-key=abc123
-func CredentialsFlag(name string) *Credentials {
-	credentials := &Credentials{}
-	flag.StringVar(
-		(*string)(&credentials.ApplicationID),
-		name+".application-id",
-		"",
-		name+" Application ID",
-	)
-	flag.StringVar(
-		&credentials.ClientKey,
-		name+".client-key",
-		"",
-		name+" Client Key",
-	)
-	flag.StringVar(
-		&credentials.JavaScriptKey,
-		name+".javascript-key",
-		"",
-		name+" JavaScript Key",
-	)
-	flag.StringVar(
-		&credentials.WindowsKey,
-		name+".windows-key",
-		"",
-		name+" Windows Key",
-	)
-	flag.StringVar(
-		&credentials.RestApiKey,
-		name+".rest-api-key",
-		"",
-		name+" REST API Key",
-	)
-	flag.StringVar(
-		&credentials.MasterKey,
-		name+".master-key",
-		"",
-		name+" Master Key",
-	)
-	return credentials
 }
 
 // Describes Permissions for Read & Write.

@@ -2,59 +2,24 @@ package parse_test
 
 import (
 	"bytes"
-	"flag"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/daaku/go.parse"
-	"github.com/facebookgo/flagconfig"
-	"github.com/facebookgo/flagenv"
-	"github.com/facebookgo/httpcontrol"
 )
 
 var (
-	defaultHttpTransport = &httpcontrol.Transport{
-		MaxIdleConnsPerHost:   50,
-		DialTimeout:           3 * time.Second,
-		ResponseHeaderTimeout: 30 * time.Second,
-		RequestTimeout:        time.Minute,
-		Stats:                 logRequestHandler,
+	defaultCredentials = &parse.Credentials{
+		ApplicationID: "spAVcBmdREXEk9IiDwXzlwe0p4pO7t18KFsHyk7j",
+		MasterKey:     "3gPo5M3TGlFPvAaod7N4iSEtCmgupKZMIC2DoYJ3",
+		RestApiKey:    "t6ON64DfTrTL4QJC322HpWbhN6fzGYo8cnjVttap",
 	}
-	defaultCredentials = parse.CredentialsFlag("parsetest")
-	defaultParseClient = &parse.Client{
-		Credentials: defaultCredentials,
-		Transport:   defaultHttpTransport,
-	}
-
-	logRequest = flag.Bool(
-		"log-requests",
-		false,
-		"will trigger verbose logging of requests",
-	)
+	defaultParseClient = &parse.Client{Credentials: defaultCredentials}
 )
-
-func init() {
-	defaultCredentials.ApplicationID = "spAVcBmdREXEk9IiDwXzlwe0p4pO7t18KFsHyk7j"
-	defaultCredentials.JavaScriptKey = "7TzsJ3Dgmb1WYPALhYX6BgDhNo99f5QCfxLZOPmO"
-	defaultCredentials.MasterKey = "3gPo5M3TGlFPvAaod7N4iSEtCmgupKZMIC2DoYJ3"
-	defaultCredentials.RestApiKey = "t6ON64DfTrTL4QJC322HpWbhN6fzGYo8cnjVttap"
-
-	flag.Usage = flagconfig.Usage
-	flagconfig.Parse()
-	flagenv.Parse()
-}
-
-func logRequestHandler(stats *httpcontrol.Stats) {
-	if *logRequest {
-		fmt.Println(stats.String())
-		fmt.Println("Header", stats.Request.Header)
-	}
-}
 
 func TestPermissionEqual(t *testing.T) {
 	t.Parallel()
@@ -197,7 +162,6 @@ func TestInvalidUnauthorizedRequest(t *testing.T) {
 	t.Parallel()
 	c := &parse.Client{
 		Credentials: &parse.Credentials{},
-		Transport:   defaultHttpTransport,
 	}
 	u, err := parse.DefaultBaseURL.Parse("classes/Foo/Bar")
 	if err != nil {
@@ -219,10 +183,8 @@ func TestRedact(t *testing.T) {
 	t.Parallel()
 	c := &parse.Client{
 		Credentials: &parse.Credentials{
-			JavaScriptKey: "js-key",
-			MasterKey:     "ms-key",
+			MasterKey: "ms-key",
 		},
-		Transport: defaultHttpTransport,
 	}
 	p := "/_JavaScriptKey=js-key&_MasterKey=ms-key"
 	u := &url.URL{
@@ -314,7 +276,6 @@ func TestMethodHelpers(t *testing.T) {
 
 	c := &parse.Client{
 		Credentials: defaultCredentials,
-		Transport:   defaultHttpTransport,
 		BaseURL: &url.URL{
 			Scheme: "https",
 			Host:   "api.parse.com",
@@ -379,7 +340,6 @@ func TestNilGetWithDefaultBaseURL(t *testing.T) {
 	t.Parallel()
 	c := &parse.Client{
 		Credentials: defaultCredentials,
-		Transport:   defaultHttpTransport,
 	}
 	_, err := c.Get(nil, nil)
 	if err == nil {
@@ -400,7 +360,6 @@ func TestRelativeGetWithDefaultBaseURL(t *testing.T) {
 	t.Parallel()
 	c := &parse.Client{
 		Credentials: defaultCredentials,
-		Transport:   defaultHttpTransport,
 	}
 	_, err := c.Get(&url.URL{Path: "Foo"}, nil)
 	if err == nil {
@@ -437,7 +396,6 @@ func TestServerAbort(t *testing.T) {
 
 		c := &parse.Client{
 			Credentials: defaultCredentials,
-			Transport:   defaultHttpTransport,
 			BaseURL:     u,
 		}
 		res := make(map[string]interface{})
