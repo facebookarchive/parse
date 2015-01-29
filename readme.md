@@ -1,4 +1,4 @@
-parse [![Build Status](https://secure.travis-ci.org/facebookgo/go.parse.png)](https://travis-ci.org/facebookgo/parse)
+parse [![Build Status](https://secure.travis-ci.org/facebookgo/parse.png)](https://travis-ci.org/facebookgo/parse)
 =====
 
 NOTE: The APIs for this package are still in flux.
