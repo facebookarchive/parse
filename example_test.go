@@ -14,7 +14,7 @@ func Example() {
 		// Credentials will automatically be included in every request.
 		Credentials: &parse.Credentials{
 			ApplicationID: "spAVcBmdREXEk9IiDwXzlwe0p4pO7t18KFsHyk7j",
-			RestApiKey:    "t6ON64DfTrTL4QJC322HpWbhN6fzGYo8cnjVttap",
+			RestAPIKey:    "t6ON64DfTrTL4QJC322HpWbhN6fzGYo8cnjVttap",
 		},
 	}
 

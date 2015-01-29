@@ -16,7 +16,7 @@ var (
 	defaultCredentials = &parse.Credentials{
 		ApplicationID: "spAVcBmdREXEk9IiDwXzlwe0p4pO7t18KFsHyk7j",
 		MasterKey:     "3gPo5M3TGlFPvAaod7N4iSEtCmgupKZMIC2DoYJ3",
-		RestApiKey:    "t6ON64DfTrTL4QJC322HpWbhN6fzGYo8cnjVttap",
+		RestAPIKey:    "t6ON64DfTrTL4QJC322HpWbhN6fzGYo8cnjVttap",
 	}
 	defaultParseClient = &parse.Client{Credentials: defaultCredentials}
 )
@@ -40,11 +40,13 @@ func TestPermissionEqual(t *testing.T) {
 func TestACL(t *testing.T) {
 	t.Parallel()
 	publicPermission := &parse.Permissions{Read: true, Write: true}
-	userID1 := parse.ID("user1")
+	const (
+		userID1 = "user1"
+		userID2 = "user2"
+		userID3 = "user3"
+	)
 	userID1Permission := &parse.Permissions{}
-	userID2 := parse.ID("user2")
 	userID2Permission := &parse.Permissions{Read: true}
-	userID3 := parse.ID("user3")
 	roleName1 := parse.RoleName("role1")
 	roleName1Permission := &parse.Permissions{}
 	roleName2 := parse.RoleName("role2")

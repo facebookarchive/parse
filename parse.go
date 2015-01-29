@@ -16,28 +16,25 @@ import (
 	"github.com/facebookgo/httperr"
 )
 
-// An Object Identifier.
-type ID string
-
 // Credentials to access an application.
 type Credentials struct {
-	ApplicationID ID
-	RestApiKey    string
+	ApplicationID string
+	RestAPIKey    string
 	MasterKey     string
 }
 
-// Describes Permissions for Read & Write.
+// Permissions for Read & Write.
 type Permissions struct {
 	Read  bool `json:"read,omitempty"`
 	Write bool `json:"write,omitempty"`
 }
 
-// Check if other Permissions is equal.
+// Equal checks if the two Permissions are equal.
 func (p *Permissions) Equal(o *Permissions) bool {
 	return p.Read == o.Read && p.Write == o.Write
 }
 
-// The required "name" field for Roles.
+// RoleName is the required "name" field for Roles.
 type RoleName string
 
 // An ACL defines a set of permissions based on various facets.
@@ -46,24 +43,25 @@ type ACL map[string]*Permissions
 // The key used by the API to represent public ACL permissions.
 const PublicPermissionKey = "*"
 
-// Permissions for the Public.
+// Public returns the Permission for the Public or "*" key.
 func (a ACL) Public() *Permissions {
 	return a[PublicPermissionKey]
 }
 
-// Permissions for a specific user, if explicitly set.
-func (a ACL) ForUserID(userID ID) *Permissions {
+// ForUserID returns the permissions for a specific user, if explicitly set.
+func (a ACL) ForUserID(userID string) *Permissions {
 	return a[string(userID)]
 }
 
-// Permissions for a specific role name, if explicitly set.
+// ForRoleName returns the permissions for a specific role name, if explicitly
+// set.
 func (a ACL) ForRoleName(roleName RoleName) *Permissions {
 	return a["role:"+string(roleName)]
 }
 
-// Base Object.
+// Object is the minimal set of fields present on every object.
 type Object struct {
-	ID        ID         `json:"objectId,omitempty"`
+	ID        string     `json:"objectId,omitempty"`
 	CreatedAt *time.Time `json:"createdAt,omitempty"`
 	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
 }
@@ -139,7 +137,7 @@ var defaultBaseURL = &url.URL{
 	Path:   "/1/",
 }
 
-// Parse API Client.
+// Client provides access to the Parse API.
 type Client struct {
 	// The underlying http.RoundTripper to perform the individual requests. When
 	// nil http.DefaultTransport will be used.
@@ -165,31 +163,31 @@ func (c *Client) transport() http.RoundTripper {
 	return c.Transport
 }
 
-// Perform a GET method call on the given url and unmarshal response into
+// Get performs a GET method call on the given url and unmarshal response into
 // result.
 func (c *Client) Get(u *url.URL, result interface{}) (*http.Response, error) {
 	return c.Do(&http.Request{Method: "GET", URL: u}, nil, result)
 }
 
-// Perform a POST method call on the given url with the given body and
+// Post performs a POST method call on the given url with the given body and
 // unmarshal response into result.
 func (c *Client) Post(u *url.URL, body, result interface{}) (*http.Response, error) {
 	return c.Do(&http.Request{Method: "POST", URL: u}, body, result)
 }
 
-// Perform a PUT method call on the given url with the given body and
+// Put performs a PUT method call on the given url with the given body and
 // unmarshal response into result.
 func (c *Client) Put(u *url.URL, body, result interface{}) (*http.Response, error) {
 	return c.Do(&http.Request{Method: "PUT", URL: u}, body, result)
 }
 
-// Perform a DELETE method call on the given url and unmarshal response into
-// result.
+// Delete performs a DELETE method call on the given url and unmarshal response
+// into result.
 func (c *Client) Delete(u *url.URL, result interface{}) (*http.Response, error) {
 	return c.Do(&http.Request{Method: "DELETE", URL: u}, nil, result)
 }
 
-// Perform a Parse API call. This method modifies the request and adds the
+// Do performs a Parse API call. This method modifies the request and adds the
 // Authentication headers. The body is JSON encoded and for responses in the
 // 2xx or 3xx range the response will be JSON decoded into result, for others
 // an error of type Error will be returned.
@@ -227,7 +225,7 @@ func (c *Client) Do(req *http.Request, body, result interface{}) (*http.Response
 			"X-Parse-Application-Id",
 			string(c.Credentials.ApplicationID),
 		)
-		req.Header.Add("X-Parse-REST-API-Key", c.Credentials.RestApiKey)
+		req.Header.Add("X-Parse-REST-API-Key", c.Credentials.RestAPIKey)
 	}
 
 	// we need to buffer as Parse requires a Content-Length
