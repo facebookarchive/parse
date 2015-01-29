@@ -44,7 +44,6 @@ func Example() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	fmt.Println(postResponse)
 
 	// This relative URL will be resolved against the client.BaseURL.
 	objectURL := url.URL{Path: classesGameScore + "/" + postResponse.ID}
@@ -56,7 +55,7 @@ func Example() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	fmt.Println(getResponse)
+	fmt.Println(getResponse.PlayerName)
 
 	// Finally delete the object discarding the response body.
 	_, err = client.Delete(&objectURL, nil)
@@ -64,4 +63,7 @@ func Example() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+
+	// Output:
+	// Sean Plott
 }
