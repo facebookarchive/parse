@@ -16,11 +16,44 @@ import (
 	"github.com/facebookgo/httperr"
 )
 
-// Credentials to access an application.
-type Credentials struct {
-	ApplicationID string
-	RestAPIKey    string
-	MasterKey     string
+const (
+	masterKeyHeader  = "X-Parse-Master-Key"
+	restAPIKeyHeader = "X-Parse-REST-API-Key"
+)
+
+var (
+	errEmptyMasterKey     = errors.New("parse: cannot use empty MasterKey Credentials")
+	errEmptyRestAPIKey    = errors.New("parse: cannot use empty RestAPIKey Credentials")
+	errEmptyApplicationID = errors.New("parse: cannot use empty ApplicationID")
+)
+
+// Credentials allows for adding authentication information to a request.
+type Credentials interface {
+	Modify(r *http.Request) error
+}
+
+// MasterKey adds the Master Key to the request.
+type MasterKey string
+
+// Modify adds the Master Key header.
+func (m MasterKey) Modify(r *http.Request) error {
+	if m == "" {
+		return errEmptyMasterKey
+	}
+	r.Header.Set(masterKeyHeader, string(m))
+	return nil
+}
+
+// RestAPIKey adds the Rest API Key to the request.
+type RestAPIKey string
+
+// Modify adds the Rest API Key header.
+func (k RestAPIKey) Modify(r *http.Request) error {
+	if k == "" {
+		return errEmptyRestAPIKey
+	}
+	r.Header.Set(restAPIKeyHeader, string(k))
+	return nil
 }
 
 // Permissions for Read & Write.
@@ -148,9 +181,11 @@ type Client struct {
 	// will be used.
 	BaseURL *url.URL
 
-	// Application Credentials to be included in the API calls. When nil no
-	// Credentials will be included.
-	Credentials *Credentials
+	// Application ID must always be specified.
+	ApplicationID string
+
+	// Credentials if set, will be included on every request.
+	Credentials Credentials
 
 	// Redact sensitive information from errors when true.
 	Redact bool
@@ -220,12 +255,15 @@ func (c *Client) Do(req *http.Request, body, result interface{}) (*http.Response
 		req.Header = make(http.Header)
 	}
 
+	if c.ApplicationID == "" {
+		return nil, errEmptyApplicationID
+	}
+	req.Header.Add("X-Parse-Application-Id", c.ApplicationID)
+
 	if c.Credentials != nil {
-		req.Header.Add(
-			"X-Parse-Application-Id",
-			string(c.Credentials.ApplicationID),
-		)
-		req.Header.Add("X-Parse-REST-API-Key", c.Credentials.RestAPIKey)
+		if err := c.Credentials.Modify(req); err != nil {
+			return nil, err
+		}
 	}
 
 	// we need to buffer as Parse requires a Content-Length
@@ -278,11 +316,10 @@ func (c *Client) Do(req *http.Request, body, result interface{}) (*http.Response
 
 // Redact sensitive information from given string.
 func (c *Client) redactor() httperr.Redactor {
-	if !c.Redact || c.Credentials == nil || c.Credentials.MasterKey == "" {
-		return httperr.RedactNoOp()
+	if c.Redact {
+		if mk, ok := c.Credentials.(MasterKey); ok {
+			return strings.NewReplacer(string(mk), "-- REDACTED MASTER KEY --")
+		}
 	}
-	return strings.NewReplacer(
-		c.Credentials.MasterKey,
-		"-- REDACTED MASTER KEY --",
-	)
+	return httperr.RedactNoOp()
 }

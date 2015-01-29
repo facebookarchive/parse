@@ -2,23 +2,26 @@ package parse_test
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"regexp"
 	"strings"
 	"testing"
 
+	"github.com/facebookgo/ensure"
 	"github.com/facebookgo/parse"
 )
 
 var (
-	defaultCredentials = &parse.Credentials{
-		ApplicationID: "spAVcBmdREXEk9IiDwXzlwe0p4pO7t18KFsHyk7j",
-		MasterKey:     "3gPo5M3TGlFPvAaod7N4iSEtCmgupKZMIC2DoYJ3",
-		RestAPIKey:    "t6ON64DfTrTL4QJC322HpWbhN6fzGYo8cnjVttap",
+	defaultApplicationID = "spAVcBmdREXEk9IiDwXzlwe0p4pO7t18KFsHyk7j"
+	defaultRestAPIKey    = parse.RestAPIKey("t6ON64DfTrTL4QJC322HpWbhN6fzGYo8cnjVttap")
+	defaultParseClient   = &parse.Client{
+		ApplicationID: defaultApplicationID,
+		Credentials:   defaultRestAPIKey,
 	}
-	defaultParseClient = &parse.Client{Credentials: defaultCredentials}
 )
 
 func TestPermissionEqual(t *testing.T) {
@@ -160,33 +163,11 @@ func TestErrorCases(t *testing.T) {
 	}
 }
 
-func TestInvalidUnauthorizedRequest(t *testing.T) {
-	t.Parallel()
-	c := &parse.Client{
-		Credentials: &parse.Credentials{},
-	}
-	u, err := url.Parse("classes/Foo/Bar")
-	if err != nil {
-		t.Fatal(err)
-	}
-	req := http.Request{Method: "GET", URL: u}
-	_, err = c.Do(&req, nil, nil)
-	if err == nil {
-		t.Fatal("was expecting error")
-	}
-	const msg = `GET https://api.parse.com/1/classes/Foo/Bar got 401 ` +
-		`Unauthorized failed with message unauthorized`
-	if actual := err.Error(); actual != msg {
-		t.Fatalf(`expected "%s" got "%s"`, msg, actual)
-	}
-}
-
 func TestRedact(t *testing.T) {
 	t.Parallel()
 	c := &parse.Client{
-		Credentials: &parse.Credentials{
-			MasterKey: "ms-key",
-		},
+		ApplicationID: defaultApplicationID,
+		Credentials:   parse.MasterKey("ms-key"),
 	}
 	p := "/_JavaScriptKey=js-key&_MasterKey=ms-key"
 	u := &url.URL{
@@ -277,7 +258,8 @@ func TestMethodHelpers(t *testing.T) {
 	t.Parallel()
 
 	c := &parse.Client{
-		Credentials: defaultCredentials,
+		ApplicationID: defaultApplicationID,
+		Credentials:   defaultRestAPIKey,
 		BaseURL: &url.URL{
 			Scheme: "https",
 			Host:   "api.parse.com",
@@ -341,7 +323,8 @@ func TestMethodHelpers(t *testing.T) {
 func TestNilGetWithDefaultBaseURL(t *testing.T) {
 	t.Parallel()
 	c := &parse.Client{
-		Credentials: defaultCredentials,
+		ApplicationID: defaultApplicationID,
+		Credentials:   defaultRestAPIKey,
 	}
 	_, err := c.Get(nil, nil)
 	if err == nil {
@@ -361,7 +344,8 @@ func TestNilGetWithDefaultBaseURL(t *testing.T) {
 func TestRelativeGetWithDefaultBaseURL(t *testing.T) {
 	t.Parallel()
 	c := &parse.Client{
-		Credentials: defaultCredentials,
+		ApplicationID: defaultApplicationID,
+		Credentials:   defaultRestAPIKey,
 	}
 	_, err := c.Get(&url.URL{Path: "Foo"}, nil)
 	if err == nil {
@@ -397,8 +381,9 @@ func TestServerAbort(t *testing.T) {
 		}
 
 		c := &parse.Client{
-			Credentials: defaultCredentials,
-			BaseURL:     u,
+			ApplicationID: defaultApplicationID,
+			Credentials:   defaultRestAPIKey,
+			BaseURL:       u,
 		}
 		res := make(map[string]interface{})
 		_, err = c.Get(nil, res)
@@ -418,9 +403,30 @@ func TestServerAbort(t *testing.T) {
 	}
 }
 
-func TestEmptyClient(t *testing.T) {
+type tansportFunc func(*http.Request) (*http.Response, error)
+
+func (t tansportFunc) RoundTrip(r *http.Request) (*http.Response, error) {
+	return t(r)
+}
+
+func TestCustomHTTPTransport(t *testing.T) {
 	t.Parallel()
-	c := &parse.Client{}
+	const message = "hello world"
+	c := &parse.Client{
+		ApplicationID: defaultApplicationID,
+		Transport: tansportFunc(func(*http.Request) (*http.Response, error) {
+			return nil, errors.New(message)
+		}),
+	}
+	_, err := c.Do(&http.Request{}, nil, nil)
+	ensure.Err(t, err, regexp.MustCompile(message))
+}
+
+func TestMissingCredentials(t *testing.T) {
+	t.Parallel()
+	c := &parse.Client{
+		ApplicationID: defaultApplicationID,
+	}
 	req := http.Request{Method: "GET", URL: &url.URL{Path: "classes/Foo/Bar"}}
 	_, err := c.Do(&req, nil, nil)
 	if err == nil {
@@ -431,4 +437,33 @@ func TestEmptyClient(t *testing.T) {
 	if actual := err.Error(); actual != msg {
 		t.Fatalf(`expected "%s" got "%s"`, msg, actual)
 	}
+}
+
+func TestEmptyMasterKey(t *testing.T) {
+	t.Parallel()
+	var mk parse.MasterKey
+	ensure.Err(t, mk.Modify(nil), regexp.MustCompile("empty MasterKey"))
+}
+
+func TestEmptyRestAPIKey(t *testing.T) {
+	t.Parallel()
+	var mk parse.RestAPIKey
+	ensure.Err(t, mk.Modify(nil), regexp.MustCompile("empty RestAPIKey"))
+}
+
+func TestEmptyApplicationID(t *testing.T) {
+	t.Parallel()
+	var c parse.Client
+	_, err := c.Do(&http.Request{}, nil, nil)
+	ensure.Err(t, err, regexp.MustCompile("empty ApplicationID"))
+}
+
+func TestCredentiasModifyError(t *testing.T) {
+	t.Parallel()
+	c := parse.Client{
+		ApplicationID: defaultApplicationID,
+		Credentials:   parse.RestAPIKey(""),
+	}
+	_, err := c.Do(&http.Request{}, nil, nil)
+	ensure.Err(t, err, regexp.MustCompile("empty RestAPIKey"))
 }

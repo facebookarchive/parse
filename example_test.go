@@ -11,11 +11,8 @@ import (
 func Example() {
 	// Clients can be used concurrently by multiple goroutines.
 	client := &parse.Client{
-		// Credentials will automatically be included in every request.
-		Credentials: &parse.Credentials{
-			ApplicationID: "spAVcBmdREXEk9IiDwXzlwe0p4pO7t18KFsHyk7j",
-			RestAPIKey:    "t6ON64DfTrTL4QJC322HpWbhN6fzGYo8cnjVttap",
-		},
+		ApplicationID: "spAVcBmdREXEk9IiDwXzlwe0p4pO7t18KFsHyk7j",
+		Credentials:   parse.RestAPIKey("t6ON64DfTrTL4QJC322HpWbhN6fzGYo8cnjVttap"),
 	}
 
 	// Our GameScore Object Type.
