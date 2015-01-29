@@ -102,9 +102,7 @@ func TestErrorCases(t *testing.T) {
 					Path:   "/",
 				},
 			},
-			Error: `GET https://www.eadf5cfd365145e99d2a3ddeec5d5f00.com/ ` +
-				`failed with dial tcp: lookup ` +
-				`www.eadf5cfd365145e99d2a3ddeec5d5f00.com: no such host`,
+			Error: `GET https://www.eadf5cfd365145e99d2a3ddeec5d5f00.com/ failed with`,
 		},
 		{
 			Request: &http.Request{
@@ -149,9 +147,7 @@ func TestErrorCases(t *testing.T) {
 		if err == nil {
 			t.Error("was expecting error")
 		}
-		if actual := err.Error(); actual != ec.Error {
-			t.Errorf("expected\n%s\ngot\n%s", ec.Error, actual)
-		}
+		ensure.StringContains(t, err.Error(), ec.Error)
 		if ec.StatusCode != 0 {
 			if res == nil {
 				t.Error("did not get expected http.Response")
@@ -182,14 +178,10 @@ func TestRedact(t *testing.T) {
 		t.Fatal("was expecting error")
 	}
 	msg := fmt.Sprintf(
-		`GET https://www.eadf5cfd365145e99d2a3ddeec5d5f00.com%s failed `+
-			`with dial tcp: lookup www.eadf5cfd365145e99d2a3ddeec5d5f00.com: `+
-			`no such host`,
+		`GET https://www.eadf5cfd365145e99d2a3ddeec5d5f00.com%s failed with`,
 		p,
 	)
-	if actual := err.Error(); actual != msg {
-		t.Fatalf("expected\n%s got\n%s", msg, actual)
-	}
+	ensure.StringContains(t, err.Error(), msg)
 
 	c.Redact = true
 	_, err = c.Do(&req, nil, nil)
@@ -198,11 +190,8 @@ func TestRedact(t *testing.T) {
 	}
 	const redacted = `GET ` +
 		`https://www.eadf5cfd365145e99d2a3ddeec5d5f00.com/_JavaScriptKey=js-key` +
-		`&_MasterKey=-- REDACTED MASTER KEY -- failed with dial tcp: ` +
-		`lookup www.eadf5cfd365145e99d2a3ddeec5d5f00.com: no such host`
-	if actual := err.Error(); actual != redacted {
-		t.Fatalf("expected\n%s\ngot\n%s", redacted, actual)
-	}
+		`&_MasterKey=-- REDACTED MASTER KEY -- failed with`
+	ensure.StringContains(t, err.Error(), redacted)
 }
 
 func TestPostDeleteObject(t *testing.T) {
