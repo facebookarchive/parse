@@ -46,7 +46,7 @@ func Example() {
 	fmt.Println(postResponse)
 
 	// This relative URL will be resolved against the client.BaseURL.
-	objectURL := url.URL{Path: string(postResponse.ID)}
+	objectURL := url.URL{Path: postResponse.ID}
 
 	// We fetch the same object again using it's ID.
 	var getResponse GameScore
