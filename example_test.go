@@ -11,18 +11,10 @@ import (
 func Example() {
 	// Clients can be used concurrently by multiple goroutines.
 	client := &parse.Client{
-
 		// Credentials will automatically be included in every request.
 		Credentials: &parse.Credentials{
 			ApplicationID: "spAVcBmdREXEk9IiDwXzlwe0p4pO7t18KFsHyk7j",
 			RestApiKey:    "t6ON64DfTrTL4QJC322HpWbhN6fzGYo8cnjVttap",
-		},
-
-		// The relative URLs used below are resolved against this base URL.
-		BaseURL: &url.URL{
-			Scheme: "https",
-			Host:   "api.parse.com",
-			Path:   "/1/classes/GameScore/",
 		},
 	}
 
