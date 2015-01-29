@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ParsePlatform/go.flagconfig"
-	"github.com/ParsePlatform/go.flagenv"
-	"github.com/ParsePlatform/go.httpcontrol"
 	"github.com/daaku/go.parse"
+	"github.com/facebookgo/flagconfig"
+	"github.com/facebookgo/flagenv"
+	"github.com/facebookgo/httpcontrol"
 )
 
 var (
@@ -337,14 +337,6 @@ func TestMethodHelpers(t *testing.T) {
 	}
 
 	oURL := &url.URL{Path: string(oPostResponse.ID)}
-
-	res, err := c.Head(oURL)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if res.StatusCode != 200 {
-		t.Fatalf("did not get expected status 200 instead got %d", res.StatusCode)
-	}
 
 	oGet := &obj{}
 	_, err = c.Get(oURL, oGet)

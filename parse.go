@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ParsePlatform/go.httperr"
+	"github.com/facebookgo/httperr"
 )
 
 // An Object Identifier.
@@ -159,6 +159,9 @@ type Error struct {
 	Message string `json:"error"`
 	Code    int    `json:"code"`
 
+	// This is the HTTP StatusCode.
+	StatusCode int `json:"-"`
+
 	request  *http.Request
 	response *http.Response
 	client   *Client
@@ -213,11 +216,6 @@ func (c *Client) transport() http.RoundTripper {
 		return http.DefaultTransport
 	}
 	return c.Transport
-}
-
-// Perform a HEAD method call on the given url.
-func (c *Client) Head(u *url.URL) (*http.Response, error) {
-	return c.Do(&http.Request{Method: "HEAD", URL: u}, nil, nil)
 }
 
 // Perform a GET method call on the given url and unmarshal response into
@@ -308,13 +306,16 @@ func (c *Client) Do(req *http.Request, body, result interface{}) (*http.Response
 		}
 
 		apiErr := &Error{
-			request:  req,
-			response: res,
-			client:   c,
+			StatusCode: res.StatusCode,
+			request:    req,
+			response:   res,
+			client:     c,
 		}
-		err = json.Unmarshal(body, apiErr)
-		if err != nil {
-			return res, httperr.NewError(err, c.redactor(), req, res)
+		if len(body) > 0 {
+			err = json.Unmarshal(body, apiErr)
+			if err != nil {
+				return res, httperr.NewError(err, c.redactor(), req, res)
+			}
 		}
 		return res, apiErr
 	}
