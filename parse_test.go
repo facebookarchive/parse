@@ -130,9 +130,9 @@ func TestErrorCases(t *testing.T) {
 		{
 			Request: &http.Request{
 				Method: "GET",
-				URL:    parse.DefaultBaseURL,
+				URL:    &url.URL{Path: "/"},
 			},
-			Error: `GET https://api.parse.com/1/ got 404 Not Found failed with` +
+			Error: `GET https://api.parse.com/ got 404 Not Found failed with` +
 				` invalid character '<' looking for beginning of value`,
 			StatusCode: 404,
 		},
@@ -163,7 +163,7 @@ func TestInvalidUnauthorizedRequest(t *testing.T) {
 	c := &parse.Client{
 		Credentials: &parse.Credentials{},
 	}
-	u, err := parse.DefaultBaseURL.Parse("classes/Foo/Bar")
+	u, err := url.Parse("classes/Foo/Bar")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -228,7 +228,7 @@ func TestPostDeleteObject(t *testing.T) {
 		Answer int `json:"answer"`
 	}
 
-	oPostURL, err := parse.DefaultBaseURL.Parse("classes/Foo")
+	oPostURL, err := url.Parse("classes/Foo")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -245,7 +245,7 @@ func TestPostDeleteObject(t *testing.T) {
 	}
 
 	p := fmt.Sprintf("classes/Foo/%s", oPostResponse.ID)
-	oGetURL, err := parse.DefaultBaseURL.Parse(p)
+	oGetURL, err := url.Parse(p)
 	if err != nil {
 		t.Fatal(err)
 	}

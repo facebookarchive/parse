@@ -133,7 +133,7 @@ func (e *Error) Error() string {
 }
 
 // The default base URL for the API.
-var DefaultBaseURL = &url.URL{
+var defaultBaseURL = &url.URL{
 	Scheme: "https",
 	Host:   "api.parse.com",
 	Path:   "/1/",
@@ -145,8 +145,9 @@ type Client struct {
 	// nil http.DefaultTransport will be used.
 	Transport http.RoundTripper
 
-	// The base URL to parse relative URLs off. If you pass absolute URLs to Client
-	// functions they are used as-is. When nil DefaultBaseURL will be used.
+	// The base URL to parse relative URLs off. If you pass absolute URLs to
+	// Client functions they are used as-is. When nil, the production Parse URL
+	// will be used.
 	BaseURL *url.URL
 
 	// Application Credentials to be included in the API calls. When nil no
@@ -199,14 +200,14 @@ func (c *Client) Do(req *http.Request, body, result interface{}) (*http.Response
 
 	if req.URL == nil {
 		if c.BaseURL == nil {
-			req.URL = DefaultBaseURL
+			req.URL = defaultBaseURL
 		} else {
 			req.URL = c.BaseURL
 		}
 	} else {
 		if !req.URL.IsAbs() {
 			if c.BaseURL == nil {
-				req.URL = DefaultBaseURL.ResolveReference(req.URL)
+				req.URL = defaultBaseURL.ResolveReference(req.URL)
 			} else {
 				req.URL = c.BaseURL.ResolveReference(req.URL)
 			}
