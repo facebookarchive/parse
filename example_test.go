@@ -19,6 +19,7 @@ func Example() {
 	}
 
 	// Our GameScore Object Type.
+	const classesGameScore = "classes/GameScore"
 	type GameScore struct {
 		parse.Object
 		Score      int    `json:"score,omitempty"`
@@ -35,11 +36,10 @@ func Example() {
 
 	// The response from creating the object - will contain the ID.
 	var postResponse parse.Object
-	const classesGame = "classes/Game"
 
 	// The HTTP response is being ignored, but is available in case you want to
 	// rely on the status code/headers.
-	_, err := client.Post(&url.URL{Path: classesGame}, &postObject, &postResponse)
+	_, err := client.Post(&url.URL{Path: classesGameScore}, &postObject, &postResponse)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -47,7 +47,7 @@ func Example() {
 	fmt.Println(postResponse)
 
 	// This relative URL will be resolved against the client.BaseURL.
-	objectURL := url.URL{Path: classesGame + "/" + postResponse.ID}
+	objectURL := url.URL{Path: classesGameScore + "/" + postResponse.ID}
 
 	// We fetch the same object again using it's ID.
 	var getResponse GameScore
