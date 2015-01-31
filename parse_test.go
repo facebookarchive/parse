@@ -258,10 +258,10 @@ func TestMethodHelpers(t *testing.T) {
 			return nil, errors.New("")
 		}),
 	}
-	c.Get(&url.URL{}, nil)
-	c.Post(&url.URL{}, nil, nil)
-	c.Put(&url.URL{}, nil, nil)
-	c.Delete(&url.URL{}, nil)
+	c.Get(nil, nil)
+	c.Post(nil, nil, nil)
+	c.Put(nil, nil, nil)
+	c.Delete(nil, nil)
 	ensure.DeepEqual(t, count, len(expected))
 }
 
@@ -290,6 +290,25 @@ func TestRelativeGetWithDefaultBaseURL(t *testing.T) {
 		Transport: transportFunc(func(r *http.Request) (*http.Response, error) {
 			defer close(done)
 			ensure.DeepEqual(t, r.URL.String(), "https://api.parse.com/1/Foo")
+			return nil, errors.New("")
+		}),
+	}
+	c.Get(&url.URL{Path: "Foo"}, nil)
+	<-done
+}
+
+func TestResolveReferenceWithBase(t *testing.T) {
+	t.Parallel()
+	done := make(chan struct{})
+	c := &parse.Client{
+		ApplicationID: defaultApplicationID,
+		Credentials:   defaultRestAPIKey,
+		BaseURL: &url.URL{
+			Path: "/1/",
+		},
+		Transport: transportFunc(func(r *http.Request) (*http.Response, error) {
+			defer close(done)
+			ensure.DeepEqual(t, r.URL.String(), "/1/Foo")
 			return nil, errors.New("")
 		}),
 	}
