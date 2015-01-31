@@ -17,13 +17,17 @@ import (
 )
 
 const (
-	masterKeyHeader  = "X-Parse-Master-Key"
-	restAPIKeyHeader = "X-Parse-REST-API-Key"
+	userAgentHeader    = "User-Agent"
+	userAgent          = "go-parse-2015-01-31"
+	masterKeyHeader    = "X-Parse-Master-Key"
+	restAPIKeyHeader   = "X-Parse-REST-API-Key"
+	sessionTokenHeader = "X-Parse-Session-Token"
 )
 
 var (
 	errEmptyMasterKey     = errors.New("parse: cannot use empty MasterKey Credentials")
 	errEmptyRestAPIKey    = errors.New("parse: cannot use empty RestAPIKey Credentials")
+	errEmptySessionToken  = errors.New("parse: cannot use empty SessionToken Credentials")
 	errEmptyApplicationID = errors.New("parse: cannot use empty ApplicationID")
 )
 
@@ -53,6 +57,25 @@ func (k RestAPIKey) Modify(r *http.Request) error {
 		return errEmptyRestAPIKey
 	}
 	r.Header.Set(restAPIKeyHeader, string(k))
+	return nil
+}
+
+// SessionToken adds the Rest API Key and the Session Token to the request.
+type SessionToken struct {
+	RestAPIKey   string
+	SessionToken string
+}
+
+// Modify adds the Session Token header.
+func (t SessionToken) Modify(r *http.Request) error {
+	if t.RestAPIKey == "" {
+		return errEmptyRestAPIKey
+	}
+	if t.SessionToken == "" {
+		return errEmptySessionToken
+	}
+	r.Header.Set(restAPIKeyHeader, string(t.RestAPIKey))
+	r.Header.Set(sessionTokenHeader, string(t.SessionToken))
 	return nil
 }
 
@@ -255,6 +278,7 @@ func (c *Client) Do(req *http.Request, body, result interface{}) (*http.Response
 		req.Header = make(http.Header)
 	}
 
+	req.Header.Add(userAgentHeader, userAgent)
 	if c.ApplicationID == "" {
 		return nil, errEmptyApplicationID
 	}
@@ -312,6 +336,15 @@ func (c *Client) Do(req *http.Request, body, result interface{}) (*http.Response
 		return res, httperr.NewError(err, c.redactor(), req, res)
 	}
 	return res, nil
+}
+
+// WithCredentials returns a new instance of the Client using the given
+// Credentials. It discards the previous Credentials.
+func (c *Client) WithCredentials(cr Credentials) *Client {
+	var c2 Client
+	c2 = *c
+	c2.Credentials = cr
+	return &c2
 }
 
 // Redact sensitive information from given string.

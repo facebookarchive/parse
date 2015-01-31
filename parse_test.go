@@ -440,11 +440,38 @@ func TestEmptyRestAPIKey(t *testing.T) {
 	ensure.Err(t, mk.Modify(nil), regexp.MustCompile("empty RestAPIKey"))
 }
 
+func TestEmptySessionToken(t *testing.T) {
+	t.Parallel()
+	var st parse.SessionToken
+	ensure.Err(t, st.Modify(nil), regexp.MustCompile("empty RestAPIKey"))
+}
+
+func TestEmptySessionTokenInSessionToken(t *testing.T) {
+	t.Parallel()
+	st := parse.SessionToken{RestAPIKey: "rk"}
+	ensure.Err(t, st.Modify(nil), regexp.MustCompile("empty SessionToken"))
+}
+
 func TestEmptyApplicationID(t *testing.T) {
 	t.Parallel()
 	var c parse.Client
 	_, err := c.Do(&http.Request{}, nil, nil)
 	ensure.Err(t, err, regexp.MustCompile("empty ApplicationID"))
+}
+
+func TestUserAgent(t *testing.T) {
+	t.Parallel()
+	done := make(chan struct{})
+	c := &parse.Client{
+		ApplicationID: defaultApplicationID,
+		Transport: tansportFunc(func(r *http.Request) (*http.Response, error) {
+			defer close(done)
+			ensure.NotDeepEqual(t, r.Header.Get("User-Agent"), "")
+			return nil, errors.New("")
+		}),
+	}
+	c.Do(&http.Request{}, nil, nil)
+	<-done
 }
 
 func TestCredentiasModifyError(t *testing.T) {
@@ -455,4 +482,26 @@ func TestCredentiasModifyError(t *testing.T) {
 	}
 	_, err := c.Do(&http.Request{}, nil, nil)
 	ensure.Err(t, err, regexp.MustCompile("empty RestAPIKey"))
+}
+
+func TestAddCredentials(t *testing.T) {
+	t.Parallel()
+	const rk = "rk"
+	const st = "st"
+	done := make(chan struct{})
+	c := &parse.Client{
+		ApplicationID: defaultApplicationID,
+		Transport: tansportFunc(func(r *http.Request) (*http.Response, error) {
+			defer close(done)
+			ensure.DeepEqual(t, r.Header.Get("X-Parse-Session-Token"), st)
+			ensure.DeepEqual(t, r.Header.Get("X-Parse-REST-API-Key"), rk)
+			return nil, errors.New("")
+		}),
+	}
+	c = c.WithCredentials(parse.SessionToken{
+		RestAPIKey:   rk,
+		SessionToken: st,
+	})
+	c.Do(&http.Request{}, nil, nil)
+	<-done
 }
