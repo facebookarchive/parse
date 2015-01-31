@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -327,13 +326,10 @@ func (c *Client) Do(req *http.Request, body, result interface{}) (*http.Response
 		return res, apiErr
 	}
 
-	if result == nil {
-		_, err = io.Copy(ioutil.Discard, res.Body)
-	} else {
-		err = json.NewDecoder(res.Body).Decode(result)
-	}
-	if err != nil {
-		return res, httperr.NewError(err, c.redactor(), req, res)
+	if result != nil {
+		if err := json.NewDecoder(res.Body).Decode(result); err != nil {
+			return res, httperr.NewError(err, c.redactor(), req, res)
+		}
 	}
 	return res, nil
 }

@@ -2,8 +2,10 @@ package parse_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -23,6 +25,18 @@ var (
 		Credentials:   defaultRestAPIKey,
 	}
 )
+
+type transportFunc func(*http.Request) (*http.Response, error)
+
+func (t transportFunc) RoundTrip(r *http.Request) (*http.Response, error) {
+	return t(r)
+}
+
+func jsonB(t testing.TB, v interface{}) []byte {
+	b, err := json.Marshal(v)
+	ensure.Nil(t, err)
+	return b
+}
 
 func TestPermissionEqual(t *testing.T) {
 	t.Parallel()
@@ -92,6 +106,7 @@ func TestErrorCases(t *testing.T) {
 		Body       interface{}
 		Error      string
 		StatusCode int
+		Transport  http.RoundTripper
 	}{
 		{
 			Request: &http.Request{
@@ -103,6 +118,9 @@ func TestErrorCases(t *testing.T) {
 				},
 			},
 			Error: `GET https://www.eadf5cfd365145e99d2a3ddeec5d5f00.com/ failed with`,
+			Transport: transportFunc(func(r *http.Request) (*http.Response, error) {
+				return nil, errors.New("")
+			}),
 		},
 		{
 			Request: &http.Request{
@@ -115,7 +133,18 @@ func TestErrorCases(t *testing.T) {
 			},
 			Error: `GET https://api.parse.com/1/classes/Foo/Bar got 404 Not Found` +
 				` failed with code 101 and message object not found for get`,
-			StatusCode: 404,
+			StatusCode: http.StatusNotFound,
+			Transport: transportFunc(func(r *http.Request) (*http.Response, error) {
+				j := jsonB(t, parse.Error{
+					Code:    101,
+					Message: "object not found for get",
+				})
+				return &http.Response{
+					StatusCode: http.StatusNotFound,
+					Status:     "404 Not Found",
+					Body:       ioutil.NopCloser(bytes.NewReader(j)),
+				}, nil
+			}),
 		},
 		{
 			Request: &http.Request{
@@ -129,6 +158,9 @@ func TestErrorCases(t *testing.T) {
 			Body: map[int]int{},
 			Error: `GET https://api.parse.com/1/classes/Foo/Bar failed with json:` +
 				` unsupported type: map[int]int`,
+			Transport: transportFunc(func(r *http.Request) (*http.Response, error) {
+				panic("not reached")
+			}),
 		},
 		{
 			Request: &http.Request{
@@ -138,12 +170,26 @@ func TestErrorCases(t *testing.T) {
 			Error: `GET https://api.parse.com/ got 404 Not Found failed with` +
 				` invalid character '<' looking for beginning of value`,
 			StatusCode: 404,
+			Transport: transportFunc(func(r *http.Request) (*http.Response, error) {
+				return &http.Response{
+					StatusCode: http.StatusNotFound,
+					Status:     "404 Not Found",
+					Body:       ioutil.NopCloser(strings.NewReader("<html>")),
+				}, nil
+			}),
 		},
 	}
 
 	t.Parallel()
 	for _, ec := range cases {
-		res, err := defaultParseClient.Do(ec.Request, ec.Body, nil)
+		c := &parse.Client{
+			ApplicationID: defaultApplicationID,
+			Credentials:   defaultRestAPIKey,
+		}
+		if !realTransport {
+			c.Transport = ec.Transport
+		}
+		res, err := c.Do(ec.Request, ec.Body, nil)
 		if err == nil {
 			t.Error("was expecting error")
 		}
@@ -194,58 +240,10 @@ func TestRedact(t *testing.T) {
 	ensure.StringContains(t, err.Error(), redacted)
 }
 
-func TestPostDeleteObject(t *testing.T) {
-	t.Parallel()
-	type obj struct {
-		Answer int `json:"answer"`
-	}
-
-	oPostURL, err := url.Parse("classes/Foo")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	oPost := &obj{Answer: 42}
-	oPostResponse := &parse.Object{}
-	oPostReq := http.Request{Method: "POST", URL: oPostURL}
-	_, err = defaultParseClient.Do(&oPostReq, oPost, oPostResponse)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if oPostResponse.ID == "" {
-		t.Fatal("did not get an ID in the response")
-	}
-
-	p := fmt.Sprintf("classes/Foo/%s", oPostResponse.ID)
-	oGetURL, err := url.Parse(p)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	oGet := &obj{}
-	oGetReq := http.Request{Method: "GET", URL: oGetURL}
-	_, err = defaultParseClient.Do(&oGetReq, nil, oGet)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if oGet.Answer != oPost.Answer {
-		t.Fatalf(
-			"did not get expected answer %d instead got %d",
-			oPost.Answer,
-			oGet.Answer,
-		)
-	}
-
-	oDelReq := http.Request{Method: "DELETE", URL: oGetURL}
-	_, err = defaultParseClient.Do(&oDelReq, nil, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
 func TestMethodHelpers(t *testing.T) {
 	t.Parallel()
-
+	expected := []string{"GET", "POST", "PUT", "DELETE"}
+	count := 0
 	c := &parse.Client{
 		ApplicationID: defaultApplicationID,
 		Credentials:   defaultRestAPIKey,
@@ -254,101 +252,49 @@ func TestMethodHelpers(t *testing.T) {
 			Host:   "api.parse.com",
 			Path:   "/1/classes/Foo/",
 		},
+		Transport: transportFunc(func(r *http.Request) (*http.Response, error) {
+			ensure.DeepEqual(t, r.Method, expected[count])
+			count++
+			return nil, errors.New("")
+		}),
 	}
-
-	type obj struct {
-		Answer int `json:"answer"`
-	}
-
-	oPost := &obj{Answer: 42}
-	oPostResponse := &parse.Object{}
-	_, err := c.Post(nil, oPost, oPostResponse)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if oPostResponse.ID == "" {
-		t.Fatal("did not get an ID in the response")
-	}
-
-	oURL := &url.URL{Path: string(oPostResponse.ID)}
-
-	oGet := &obj{}
-	_, err = c.Get(oURL, oGet)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if oGet.Answer != oPost.Answer {
-		t.Fatalf(
-			"did not get expected answer %d instead got %d",
-			oPost.Answer,
-			oGet.Answer,
-		)
-	}
-
-	oPut := &obj{Answer: 43}
-	_, err = c.Put(oURL, oPut, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = c.Get(oURL, oGet)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if oGet.Answer != oPut.Answer {
-		t.Fatalf(
-			"did not get expected answer %d instead got %d",
-			oPut.Answer,
-			oGet.Answer,
-		)
-	}
-
-	_, err = c.Delete(oURL, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	c.Get(&url.URL{}, nil)
+	c.Post(&url.URL{}, nil, nil)
+	c.Put(&url.URL{}, nil, nil)
+	c.Delete(&url.URL{}, nil)
+	ensure.DeepEqual(t, count, len(expected))
 }
 
 func TestNilGetWithDefaultBaseURL(t *testing.T) {
 	t.Parallel()
+	done := make(chan struct{})
 	c := &parse.Client{
 		ApplicationID: defaultApplicationID,
 		Credentials:   defaultRestAPIKey,
+		Transport: transportFunc(func(r *http.Request) (*http.Response, error) {
+			defer close(done)
+			ensure.DeepEqual(t, r.URL.String(), "https://api.parse.com/1/")
+			return nil, errors.New("")
+		}),
 	}
-	_, err := c.Get(nil, nil)
-	if err == nil {
-		t.Fatal("was expecting an error")
-	}
-	const expected = `GET https://api.parse.com/1/ got 404 Not Found failed ` +
-		`with invalid character '<' looking for beginning of value`
-	if err.Error() != expected {
-		t.Fatalf(
-			"did not get expected error\n%s instead got\n%s",
-			expected,
-			err,
-		)
-	}
+	c.Get(nil, nil)
+	<-done
 }
 
 func TestRelativeGetWithDefaultBaseURL(t *testing.T) {
 	t.Parallel()
+	done := make(chan struct{})
 	c := &parse.Client{
 		ApplicationID: defaultApplicationID,
 		Credentials:   defaultRestAPIKey,
+		Transport: transportFunc(func(r *http.Request) (*http.Response, error) {
+			defer close(done)
+			ensure.DeepEqual(t, r.URL.String(), "https://api.parse.com/1/Foo")
+			return nil, errors.New("")
+		}),
 	}
-	_, err := c.Get(&url.URL{Path: "Foo"}, nil)
-	if err == nil {
-		t.Fatal("was expecting an error")
-	}
-	const expected = `GET https://api.parse.com/1/Foo got 404 Not Found failed` +
-		` with invalid character '<' looking for beginning of value`
-	if err.Error() != expected {
-		t.Fatalf(
-			"did not get expected error\n%s instead got\n%s",
-			expected,
-			err,
-		)
-	}
+	c.Get(&url.URL{Path: "Foo"}, nil)
+	<-done
 }
 
 func TestServerAbort(t *testing.T) {
@@ -392,40 +338,17 @@ func TestServerAbort(t *testing.T) {
 	}
 }
 
-type tansportFunc func(*http.Request) (*http.Response, error)
-
-func (t tansportFunc) RoundTrip(r *http.Request) (*http.Response, error) {
-	return t(r)
-}
-
 func TestCustomHTTPTransport(t *testing.T) {
 	t.Parallel()
 	const message = "hello world"
 	c := &parse.Client{
 		ApplicationID: defaultApplicationID,
-		Transport: tansportFunc(func(*http.Request) (*http.Response, error) {
+		Transport: transportFunc(func(*http.Request) (*http.Response, error) {
 			return nil, errors.New(message)
 		}),
 	}
 	_, err := c.Do(&http.Request{}, nil, nil)
 	ensure.Err(t, err, regexp.MustCompile(message))
-}
-
-func TestMissingCredentials(t *testing.T) {
-	t.Parallel()
-	c := &parse.Client{
-		ApplicationID: defaultApplicationID,
-	}
-	req := http.Request{Method: "GET", URL: &url.URL{Path: "classes/Foo/Bar"}}
-	_, err := c.Do(&req, nil, nil)
-	if err == nil {
-		t.Fatal("was expecting error")
-	}
-	const msg = `GET https://api.parse.com/1/classes/Foo/Bar got 401 ` +
-		`Unauthorized failed with message unauthorized`
-	if actual := err.Error(); actual != msg {
-		t.Fatalf(`expected "%s" got "%s"`, msg, actual)
-	}
 }
 
 func TestEmptyMasterKey(t *testing.T) {
@@ -464,7 +387,7 @@ func TestUserAgent(t *testing.T) {
 	done := make(chan struct{})
 	c := &parse.Client{
 		ApplicationID: defaultApplicationID,
-		Transport: tansportFunc(func(r *http.Request) (*http.Response, error) {
+		Transport: transportFunc(func(r *http.Request) (*http.Response, error) {
 			defer close(done)
 			ensure.NotDeepEqual(t, r.Header.Get("User-Agent"), "")
 			return nil, errors.New("")
@@ -491,7 +414,7 @@ func TestAddCredentials(t *testing.T) {
 	done := make(chan struct{})
 	c := &parse.Client{
 		ApplicationID: defaultApplicationID,
-		Transport: tansportFunc(func(r *http.Request) (*http.Response, error) {
+		Transport: transportFunc(func(r *http.Request) (*http.Response, error) {
 			defer close(done)
 			ensure.DeepEqual(t, r.Header.Get("X-Parse-Session-Token"), st)
 			ensure.DeepEqual(t, r.Header.Get("X-Parse-REST-API-Key"), rk)
@@ -504,4 +427,37 @@ func TestAddCredentials(t *testing.T) {
 	})
 	c.Do(&http.Request{}, nil, nil)
 	<-done
+}
+
+func TestContentLengthHeader(t *testing.T) {
+	t.Parallel()
+	done := make(chan struct{})
+	c := &parse.Client{
+		ApplicationID: defaultApplicationID,
+		Transport: transportFunc(func(r *http.Request) (*http.Response, error) {
+			defer close(done)
+			ensure.DeepEqual(t, r.ContentLength, int64(4))
+			return nil, errors.New("")
+		}),
+	}
+	c.Post(nil, true, nil)
+	<-done
+}
+
+func TestSuccessfulRequest(t *testing.T) {
+	t.Parallel()
+	expected := map[string]int{"answer": 42}
+	c := &parse.Client{
+		ApplicationID: defaultApplicationID,
+		Transport: transportFunc(func(r *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       ioutil.NopCloser(bytes.NewReader(jsonB(t, expected))),
+			}, nil
+		}),
+	}
+	var m map[string]int
+	_, err := c.Post(nil, true, &m)
+	ensure.Nil(t, err)
+	ensure.DeepEqual(t, m, expected)
 }

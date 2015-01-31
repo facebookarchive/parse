@@ -1,3 +1,5 @@
+// +build integration
+
 package parse_test
 
 import (
