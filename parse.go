@@ -14,17 +14,25 @@ import (
 )
 
 const (
-	userAgentHeader    = "User-Agent"
-	userAgent          = "go-parse-2015-01-31"
-	masterKeyHeader    = "X-Parse-Master-Key"
-	restAPIKeyHeader   = "X-Parse-REST-API-Key"
-	sessionTokenHeader = "X-Parse-Session-Token"
+	userAgentHeader     = "User-Agent"
+	userAgent           = "go-parse-2015-01-31"
+	masterKeyHeader     = "X-Parse-Master-Key"
+	restAPIKeyHeader    = "X-Parse-REST-API-Key"
+	sessionTokenHeader  = "X-Parse-Session-Token"
+	applicationIDHeader = "X-Parse-Application-Id"
 )
 
 var (
 	errEmptyMasterKey    = errors.New("parse: cannot use empty MasterKey Credentials")
 	errEmptyRestAPIKey   = errors.New("parse: cannot use empty RestAPIKey Credentials")
 	errEmptySessionToken = errors.New("parse: cannot use empty SessionToken Credentials")
+
+	// The default base URL for the API.
+	defaultBaseURL = &url.URL{
+		Scheme: "https",
+		Host:   "api.parse.com",
+		Path:   "/1/",
+	}
 )
 
 // Credentials allows for adding authentication information to a request.
@@ -105,13 +113,6 @@ func (e *Error) Error() string {
 		e.request,
 		e.response,
 	).Error()
-}
-
-// The default base URL for the API.
-var defaultBaseURL = &url.URL{
-	Scheme: "https",
-	Host:   "api.parse.com",
-	Path:   "/1/",
 }
 
 // Client provides access to the Parse API.
@@ -198,7 +199,7 @@ func (c *Client) Do(req *http.Request, body, result interface{}) (*http.Response
 
 	req.Header.Add(userAgentHeader, userAgent)
 	if c.ApplicationID != "" {
-		req.Header.Add("X-Parse-Application-Id", c.ApplicationID)
+		req.Header.Add(applicationIDHeader, c.ApplicationID)
 	}
 
 	if c.Credentials != nil {
