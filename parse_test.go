@@ -143,41 +143,6 @@ func TestErrorCases(t *testing.T) {
 	}
 }
 
-func TestRedact(t *testing.T) {
-	t.Parallel()
-	c := &parse.Client{
-		ApplicationID: defaultApplicationID,
-		Credentials:   parse.MasterKey("ms-key"),
-	}
-	p := "/_JavaScriptKey=js-key&_MasterKey=ms-key"
-	u := &url.URL{
-		Scheme: "https",
-		Host:   "www.eadf5cfd365145e99d2a3ddeec5d5f00.com",
-		Path:   p,
-	}
-
-	req := http.Request{Method: "GET", URL: u}
-	_, err := c.Do(&req, nil, nil)
-	if err == nil {
-		t.Fatal("was expecting error")
-	}
-	msg := fmt.Sprintf(
-		`GET https://www.eadf5cfd365145e99d2a3ddeec5d5f00.com%s failed with`,
-		p,
-	)
-	ensure.StringContains(t, err.Error(), msg)
-
-	c.Redact = true
-	_, err = c.Do(&req, nil, nil)
-	if err == nil {
-		t.Fatal("was expecting error")
-	}
-	const redacted = `GET ` +
-		`https://www.eadf5cfd365145e99d2a3ddeec5d5f00.com/_JavaScriptKey=js-key` +
-		`&_MasterKey=-- REDACTED MASTER KEY -- failed with`
-	ensure.StringContains(t, err.Error(), redacted)
-}
-
 func TestMethodHelpers(t *testing.T) {
 	t.Parallel()
 	expected := []string{"GET", "POST", "PUT", "DELETE"}
@@ -417,4 +382,12 @@ func TestSuccessfulRequest(t *testing.T) {
 	_, err := c.Post(nil, true, &m)
 	ensure.Nil(t, err)
 	ensure.DeepEqual(t, m, expected)
+}
+
+func TestMasterKeyModify(t *testing.T) {
+	t.Parallel()
+	const k = "42"
+	req := http.Request{Header: make(http.Header)}
+	ensure.Nil(t, parse.MasterKey(k).Modify(&req))
+	ensure.DeepEqual(t, req.Header.Get("X-Parse-Master-Key"), k)
 }

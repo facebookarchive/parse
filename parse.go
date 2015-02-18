@@ -9,7 +9,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"strings"
 
 	"github.com/facebookgo/httperr"
 )
@@ -88,7 +87,6 @@ type Error struct {
 
 	request  *http.Request
 	response *http.Response
-	client   *Client
 }
 
 func (e *Error) Error() string {
@@ -104,7 +102,7 @@ func (e *Error) Error() string {
 	}
 	return httperr.NewError(
 		errors.New(buf.String()),
-		e.client.redactor(),
+		httperr.RedactNoOp(),
 		e.request,
 		e.response,
 	).Error()
@@ -133,9 +131,6 @@ type Client struct {
 
 	// Credentials if set, will be included on every request.
 	Credentials Credentials
-
-	// Redact sensitive information from errors when true.
-	Redact bool
 }
 
 func (c *Client) transport() http.RoundTripper {
@@ -218,7 +213,7 @@ func (c *Client) Do(req *http.Request, body, result interface{}) (*http.Response
 	if body != nil {
 		bd, err := json.Marshal(body)
 		if err != nil {
-			return nil, httperr.NewError(err, c.redactor(), req, nil)
+			return nil, httperr.NewError(err, httperr.RedactNoOp(), req, nil)
 		}
 		req.Body = ioutil.NopCloser(bytes.NewReader(bd))
 		req.ContentLength = int64(len(bd))
@@ -226,26 +221,25 @@ func (c *Client) Do(req *http.Request, body, result interface{}) (*http.Response
 
 	res, err := c.transport().RoundTrip(req)
 	if err != nil {
-		return res, httperr.NewError(err, c.redactor(), req, res)
+		return res, httperr.NewError(err, httperr.RedactNoOp(), req, res)
 	}
 	defer res.Body.Close()
 
 	if res.StatusCode > 399 || res.StatusCode < 200 {
 		body, err := ioutil.ReadAll(res.Body)
 		if err != nil {
-			return res, httperr.NewError(err, c.redactor(), req, res)
+			return res, httperr.NewError(err, httperr.RedactNoOp(), req, res)
 		}
 
 		apiErr := &Error{
 			StatusCode: res.StatusCode,
 			request:    req,
 			response:   res,
-			client:     c,
 		}
 		if len(body) > 0 {
 			err = json.Unmarshal(body, apiErr)
 			if err != nil {
-				return res, httperr.NewError(err, c.redactor(), req, res)
+				return res, httperr.NewError(err, httperr.RedactNoOp(), req, res)
 			}
 		}
 		return res, apiErr
@@ -253,7 +247,7 @@ func (c *Client) Do(req *http.Request, body, result interface{}) (*http.Response
 
 	if result != nil {
 		if err := json.NewDecoder(res.Body).Decode(result); err != nil {
-			return res, httperr.NewError(err, c.redactor(), req, res)
+			return res, httperr.NewError(err, httperr.RedactNoOp(), req, res)
 		}
 	}
 	return res, nil
@@ -266,14 +260,4 @@ func (c *Client) WithCredentials(cr Credentials) *Client {
 	c2 = *c
 	c2.Credentials = cr
 	return &c2
-}
-
-// Redact sensitive information from given string.
-func (c *Client) redactor() httperr.Redactor {
-	if c.Redact {
-		if mk, ok := c.Credentials.(MasterKey); ok {
-			return strings.NewReplacer(string(mk), "-- REDACTED MASTER KEY --")
-		}
-	}
-	return httperr.RedactNoOp()
 }
