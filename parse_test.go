@@ -380,7 +380,27 @@ func TestSuccessfulRequest(t *testing.T) {
 func TestMasterKeyModify(t *testing.T) {
 	t.Parallel()
 	const k = "42"
-	req := http.Request{Header: make(http.Header)}
+	var req http.Request
 	ensure.Nil(t, parse.MasterKey(k).Modify(&req))
 	ensure.DeepEqual(t, req.Header.Get("X-Parse-Master-Key"), k)
+}
+
+func TestRestAPIKeyModify(t *testing.T) {
+	t.Parallel()
+	const k = "42"
+	var req http.Request
+	ensure.Nil(t, parse.RestAPIKey(k).Modify(&req))
+	ensure.DeepEqual(t, req.Header.Get("X-Parse-REST-API-Key"), k)
+}
+
+func TestSessionTokenModify(t *testing.T) {
+	t.Parallel()
+	st := parse.SessionToken{
+		RestAPIKey:   "42",
+		SessionToken: "43",
+	}
+	var req http.Request
+	ensure.Nil(t, st.Modify(&req))
+	ensure.DeepEqual(t, req.Header.Get("X-Parse-REST-API-Key"), st.RestAPIKey)
+	ensure.DeepEqual(t, req.Header.Get("X-Parse-Session-Token"), st.SessionToken)
 }

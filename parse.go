@@ -48,6 +48,9 @@ func (m MasterKey) Modify(r *http.Request) error {
 	if m == "" {
 		return errEmptyMasterKey
 	}
+	if r.Header == nil {
+		r.Header = make(http.Header)
+	}
 	r.Header.Set(masterKeyHeader, string(m))
 	return nil
 }
@@ -59,6 +62,9 @@ type RestAPIKey string
 func (k RestAPIKey) Modify(r *http.Request) error {
 	if k == "" {
 		return errEmptyRestAPIKey
+	}
+	if r.Header == nil {
+		r.Header = make(http.Header)
 	}
 	r.Header.Set(restAPIKeyHeader, string(k))
 	return nil
@@ -77,6 +83,9 @@ func (t SessionToken) Modify(r *http.Request) error {
 	}
 	if t.SessionToken == "" {
 		return errEmptySessionToken
+	}
+	if r.Header == nil {
+		r.Header = make(http.Header)
 	}
 	r.Header.Set(restAPIKeyHeader, string(t.RestAPIKey))
 	r.Header.Set(sessionTokenHeader, string(t.SessionToken))
