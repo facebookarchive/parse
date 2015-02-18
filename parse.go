@@ -28,7 +28,7 @@ var (
 	errEmptySessionToken = errors.New("parse: cannot use empty SessionToken Credentials")
 
 	// The default base URL for the API.
-	defaultBaseURL = &url.URL{
+	defaultBaseURL = url.URL{
 		Scheme: "https",
 		Host:   "api.parse.com",
 		Path:   "/1/",
@@ -173,7 +173,7 @@ func (c *Client) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	if req.URL == nil {
 		if c.BaseURL == nil {
-			req.URL = defaultBaseURL
+			req.URL = &defaultBaseURL
 		} else {
 			req.URL = c.BaseURL
 		}
