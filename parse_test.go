@@ -297,13 +297,6 @@ func TestEmptySessionTokenInSessionToken(t *testing.T) {
 	ensure.Err(t, st.Modify(nil), regexp.MustCompile("empty SessionToken"))
 }
 
-func TestEmptyApplicationID(t *testing.T) {
-	t.Parallel()
-	var c parse.Client
-	_, err := c.Do(&http.Request{}, nil, nil)
-	ensure.Err(t, err, regexp.MustCompile("empty ApplicationID"))
-}
-
 func TestUserAgent(t *testing.T) {
 	t.Parallel()
 	done := make(chan struct{})

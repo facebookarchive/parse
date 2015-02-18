@@ -22,10 +22,9 @@ const (
 )
 
 var (
-	errEmptyMasterKey     = errors.New("parse: cannot use empty MasterKey Credentials")
-	errEmptyRestAPIKey    = errors.New("parse: cannot use empty RestAPIKey Credentials")
-	errEmptySessionToken  = errors.New("parse: cannot use empty SessionToken Credentials")
-	errEmptyApplicationID = errors.New("parse: cannot use empty ApplicationID")
+	errEmptyMasterKey    = errors.New("parse: cannot use empty MasterKey Credentials")
+	errEmptyRestAPIKey   = errors.New("parse: cannot use empty RestAPIKey Credentials")
+	errEmptySessionToken = errors.New("parse: cannot use empty SessionToken Credentials")
 )
 
 // Credentials allows for adding authentication information to a request.
@@ -126,7 +125,7 @@ type Client struct {
 	// will be used.
 	BaseURL *url.URL
 
-	// Application ID must always be specified.
+	// Application ID will be included if not empty.
 	ApplicationID string
 
 	// Credentials if set, will be included on every request.
@@ -198,10 +197,9 @@ func (c *Client) Do(req *http.Request, body, result interface{}) (*http.Response
 	}
 
 	req.Header.Add(userAgentHeader, userAgent)
-	if c.ApplicationID == "" {
-		return nil, errEmptyApplicationID
+	if c.ApplicationID != "" {
+		req.Header.Add("X-Parse-Application-Id", c.ApplicationID)
 	}
-	req.Header.Add("X-Parse-Application-Id", c.ApplicationID)
 
 	if c.Credentials != nil {
 		if err := c.Credentials.Modify(req); err != nil {
