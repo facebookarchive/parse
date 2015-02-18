@@ -24,8 +24,12 @@ func TestPostDeleteObject(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	type Object struct {
+		ID string `json:"objectId,omitempty"`
+	}
+
 	oPost := &obj{Answer: 42}
-	oPostResponse := &parse.Object{}
+	oPostResponse := &Object{}
 	oPostReq := http.Request{Method: "POST", URL: oPostURL}
 	_, err = defaultParseClient.Do(&oPostReq, oPost, oPostResponse)
 	if err != nil {

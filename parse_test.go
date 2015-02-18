@@ -38,68 +38,6 @@ func jsonB(t testing.TB, v interface{}) []byte {
 	return b
 }
 
-func TestPermissionEqual(t *testing.T) {
-	t.Parallel()
-	cases := []struct {
-		p1, p2   *parse.Permissions
-		expected bool
-	}{
-		{&parse.Permissions{Read: true}, &parse.Permissions{Read: true}, true},
-		{&parse.Permissions{Read: true}, &parse.Permissions{}, false},
-	}
-	for n, c := range cases {
-		if c.p1.Equal(c.p2) != c.expected {
-			t.Fatalf("case %d was not as expected", n)
-		}
-	}
-}
-
-func TestACL(t *testing.T) {
-	t.Parallel()
-	publicPermission := &parse.Permissions{Read: true, Write: true}
-	const (
-		userID1 = "user1"
-		userID2 = "user2"
-		userID3 = "user3"
-	)
-	userID1Permission := &parse.Permissions{}
-	userID2Permission := &parse.Permissions{Read: true}
-	roleName1 := parse.RoleName("role1")
-	roleName1Permission := &parse.Permissions{}
-	roleName2 := parse.RoleName("role2")
-	roleName2Permission := &parse.Permissions{}
-	roleName3 := parse.RoleName("role3")
-	acl := parse.ACL{
-		parse.PublicPermissionKey:   publicPermission,
-		string(userID1):             userID1Permission,
-		string(userID2):             userID2Permission,
-		"role:" + string(roleName1): roleName1Permission,
-		"role:" + string(roleName2): roleName2Permission,
-	}
-
-	if !acl.Public().Equal(publicPermission) {
-		t.Fatal("did not find expected public permission")
-	}
-	if !acl.ForUserID(userID1).Equal(userID1Permission) {
-		t.Fatal("did not find expected userID1 permission")
-	}
-	if !acl.ForUserID(userID2).Equal(userID2Permission) {
-		t.Fatal("did not find expected userID2 permission")
-	}
-	if acl.ForUserID(userID3) != nil {
-		t.Fatal("did not find expected userID3 permission")
-	}
-	if !acl.ForRoleName(roleName1).Equal(roleName1Permission) {
-		t.Fatal("did not find expected roleName1 permission")
-	}
-	if !acl.ForRoleName(roleName1).Equal(roleName2Permission) {
-		t.Fatal("did not find expected roleName2 permission")
-	}
-	if acl.ForRoleName(roleName3) != nil {
-		t.Fatal("did not find expected roleName3 permission")
-	}
-}
-
 func TestErrorCases(t *testing.T) {
 	cases := []struct {
 		Request    *http.Request

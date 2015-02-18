@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 
 	"github.com/facebookgo/httperr"
 )
@@ -76,80 +75,6 @@ func (t SessionToken) Modify(r *http.Request) error {
 	r.Header.Set(restAPIKeyHeader, string(t.RestAPIKey))
 	r.Header.Set(sessionTokenHeader, string(t.SessionToken))
 	return nil
-}
-
-// Permissions for Read & Write.
-type Permissions struct {
-	Read  bool `json:"read,omitempty"`
-	Write bool `json:"write,omitempty"`
-}
-
-// Equal checks if the two Permissions are equal.
-func (p *Permissions) Equal(o *Permissions) bool {
-	return p.Read == o.Read && p.Write == o.Write
-}
-
-// RoleName is the required "name" field for Roles.
-type RoleName string
-
-// An ACL defines a set of permissions based on various facets.
-type ACL map[string]*Permissions
-
-// The key used by the API to represent public ACL permissions.
-const PublicPermissionKey = "*"
-
-// Public returns the Permission for the Public or "*" key.
-func (a ACL) Public() *Permissions {
-	return a[PublicPermissionKey]
-}
-
-// ForUserID returns the permissions for a specific user, if explicitly set.
-func (a ACL) ForUserID(userID string) *Permissions {
-	return a[string(userID)]
-}
-
-// ForRoleName returns the permissions for a specific role name, if explicitly
-// set.
-func (a ACL) ForRoleName(roleName RoleName) *Permissions {
-	return a["role:"+string(roleName)]
-}
-
-// Object is the minimal set of fields present on every object.
-type Object struct {
-	ID        string     `json:"objectId,omitempty"`
-	CreatedAt *time.Time `json:"createdAt,omitempty"`
-	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
-}
-
-// User object.
-type User struct {
-	Object
-	Email         string `json:"email,omitempty"`
-	Username      string `json:"username,omitempty"`
-	Phone         string `json:"phone,omitempty"`
-	EmailVerified bool   `json:"emailVerified,omitempty"`
-	SessionToken  string `json:"sessionToken,omitempty"`
-
-	AuthData *struct {
-		Facebook *struct {
-			ID          string    `json:"id,omitempty"`
-			AccessToken string    `json:"access_token,omitempty"`
-			Expiration  time.Time `json:"expiration_date,omitempty"`
-		} `json:"facebook,omitempty"`
-
-		Twitter *struct {
-			ID              string `json:"id,omitempty"`
-			ScreenName      string `json:"screen_name,omitempty"`
-			ConsumerKey     string `json:"consumer_key,omitempty"`
-			ConsumerSecret  string `json:"consumer_secret,omitempty"`
-			AuthToken       string `json:"auth_token,omitempty"`
-			AuthTokenSecret string `json:"auth_token_secret,omitempty"`
-		} `json:"twitter,omitempty"`
-
-		Anonymous *struct {
-			ID string `json:"id,omitempty"`
-		} `json:"anonymous,omitempty"`
-	} `json:"authData,omitempty"`
 }
 
 // An Error from the Parse API.
