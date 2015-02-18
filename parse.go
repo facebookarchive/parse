@@ -15,7 +15,7 @@ import (
 
 const (
 	userAgentHeader     = "User-Agent"
-	userAgent           = "go-parse-2015-01-31"
+	userAgent           = "go-parse-1"
 	masterKeyHeader     = "X-Parse-Master-Key"
 	restAPIKeyHeader    = "X-Parse-REST-API-Key"
 	sessionTokenHeader  = "X-Parse-Session-Token"
