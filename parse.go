@@ -164,11 +164,9 @@ func (c *Client) Delete(u *url.URL, result interface{}) (*http.Response, error) 
 	return c.Do(&http.Request{Method: "DELETE", URL: u}, nil, result)
 }
 
-// Do performs a Parse API call. This method modifies the request and adds the
-// Authentication headers. The body is JSON encoded and for responses in the
-// 2xx or 3xx range the response will be JSON decoded into result, for others
-// an error of type Error will be returned.
-func (c *Client) Do(req *http.Request, body, result interface{}) (*http.Response, error) {
+// RoundTrip performs a RoundTrip ignoring the request and response bodies. It
+// is up to the caller to close them. This method modifies the request.
+func (c *Client) RoundTrip(req *http.Request) (*http.Response, error) {
 	req.Proto = "HTTP/1.1"
 	req.ProtoMajor = 1
 	req.ProtoMinor = 1
@@ -208,21 +206,10 @@ func (c *Client) Do(req *http.Request, body, result interface{}) (*http.Response
 		}
 	}
 
-	// we need to buffer as Parse requires a Content-Length
-	if body != nil {
-		bd, err := json.Marshal(body)
-		if err != nil {
-			return nil, httperr.NewError(err, httperr.RedactNoOp(), req, nil)
-		}
-		req.Body = ioutil.NopCloser(bytes.NewReader(bd))
-		req.ContentLength = int64(len(bd))
-	}
-
 	res, err := c.transport().RoundTrip(req)
 	if err != nil {
 		return res, httperr.NewError(err, httperr.RedactNoOp(), req, res)
 	}
-	defer res.Body.Close()
 
 	if res.StatusCode > 399 || res.StatusCode < 200 {
 		body, err := ioutil.ReadAll(res.Body)
@@ -243,6 +230,30 @@ func (c *Client) Do(req *http.Request, body, result interface{}) (*http.Response
 		}
 		return res, apiErr
 	}
+
+	return res, nil
+}
+
+// Do performs a Parse API call. This method modifies the request and adds the
+// Authentication headers. The body is JSON encoded and for responses in the
+// 2xx or 3xx range the response will be JSON decoded into result, for others
+// an error of type Error will be returned.
+func (c *Client) Do(req *http.Request, body, result interface{}) (*http.Response, error) {
+	// we need to buffer as Parse requires a Content-Length
+	if body != nil {
+		bd, err := json.Marshal(body)
+		if err != nil {
+			return nil, httperr.NewError(err, httperr.RedactNoOp(), req, nil)
+		}
+		req.Body = ioutil.NopCloser(bytes.NewReader(bd))
+		req.ContentLength = int64(len(bd))
+	}
+
+	res, err := c.RoundTrip(req)
+	if err != nil {
+		return res, err
+	}
+	defer res.Body.Close()
 
 	if result != nil {
 		if err := json.NewDecoder(res.Body).Decode(result); err != nil {
