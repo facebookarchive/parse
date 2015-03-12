@@ -9,8 +9,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-
-	"github.com/facebookgo/httperr"
 )
 
 const (
@@ -19,13 +17,14 @@ const (
 	masterKeyHeader     = "X-Parse-Master-Key"
 	restAPIKeyHeader    = "X-Parse-REST-API-Key"
 	sessionTokenHeader  = "X-Parse-Session-Token"
-	applicationIDHeader = "X-Parse-Application-Id"
+	applicationIDHeader = "X-Parse-Application-ID"
 )
 
 var (
-	errEmptyMasterKey    = errors.New("parse: cannot use empty MasterKey Credentials")
-	errEmptyRestAPIKey   = errors.New("parse: cannot use empty RestAPIKey Credentials")
-	errEmptySessionToken = errors.New("parse: cannot use empty SessionToken Credentials")
+	errEmptyApplicationID = errors.New("parse: cannot use empty ApplicationID")
+	errEmptyMasterKey     = errors.New("parse: cannot use empty MasterKey")
+	errEmptyRestAPIKey    = errors.New("parse: cannot use empty RestAPIKey")
+	errEmptySessionToken  = errors.New("parse: cannot use empty SessionToken")
 
 	// The default base URL for the API.
 	defaultBaseURL = url.URL{
@@ -41,43 +40,61 @@ type Credentials interface {
 }
 
 // MasterKey adds the Master Key to the request.
-type MasterKey string
+type MasterKey struct {
+	ApplicationID string
+	MasterKey     string
+}
 
 // Modify adds the Master Key header.
 func (m MasterKey) Modify(r *http.Request) error {
-	if m == "" {
+	if m.ApplicationID == "" {
+		return errEmptyApplicationID
+	}
+	if m.MasterKey == "" {
 		return errEmptyMasterKey
 	}
 	if r.Header == nil {
 		r.Header = make(http.Header)
 	}
-	r.Header.Set(masterKeyHeader, string(m))
+	r.Header.Set(applicationIDHeader, string(m.ApplicationID))
+	r.Header.Set(masterKeyHeader, string(m.MasterKey))
 	return nil
 }
 
 // RestAPIKey adds the Rest API Key to the request.
-type RestAPIKey string
+type RestAPIKey struct {
+	ApplicationID string
+	RestAPIKey    string
+}
 
 // Modify adds the Rest API Key header.
 func (k RestAPIKey) Modify(r *http.Request) error {
-	if k == "" {
+	if k.ApplicationID == "" {
+		return errEmptyApplicationID
+	}
+	if k.RestAPIKey == "" {
 		return errEmptyRestAPIKey
 	}
 	if r.Header == nil {
 		r.Header = make(http.Header)
 	}
-	r.Header.Set(restAPIKeyHeader, string(k))
+	r.Header.Set(applicationIDHeader, string(k.ApplicationID))
+	r.Header.Set(restAPIKeyHeader, string(k.RestAPIKey))
 	return nil
 }
 
 // SessionToken adds the Rest API Key and the Session Token to the request.
 type SessionToken struct {
-	RestAPIKey   string
-	SessionToken string
+	ApplicationID string
+	RestAPIKey    string
+	SessionToken  string
 }
 
 // Modify adds the Session Token header.
 func (t SessionToken) Modify(r *http.Request) error {
+	if t.ApplicationID == "" {
+		return errEmptyApplicationID
+	}
 	if t.RestAPIKey == "" {
 		return errEmptyRestAPIKey
 	}
@@ -87,6 +104,7 @@ func (t SessionToken) Modify(r *http.Request) error {
 	if r.Header == nil {
 		r.Header = make(http.Header)
 	}
+	r.Header.Set(applicationIDHeader, string(t.ApplicationID))
 	r.Header.Set(restAPIKeyHeader, string(t.RestAPIKey))
 	r.Header.Set(sessionTokenHeader, string(t.SessionToken))
 	return nil
@@ -114,14 +132,9 @@ func (e *Error) Error() string {
 		fmt.Fprint(&buf, " and ")
 	}
 	if e.Message != "" {
-		fmt.Fprintf(&buf, "message %s", e.Message)
+		fmt.Fprintf(&buf, "message %q", e.Message)
 	}
-	return httperr.NewError(
-		errors.New(buf.String()),
-		httperr.RedactNoOp(),
-		e.request,
-		e.response,
-	).Error()
+	return buf.String()
 }
 
 // Client provides access to the Parse API.
@@ -134,9 +147,6 @@ type Client struct {
 	// Client functions they are used as-is. When nil, the production Parse URL
 	// will be used.
 	BaseURL *url.URL
-
-	// Application ID will be included if not empty.
-	ApplicationID string
 
 	// Credentials if set, will be included on every request.
 	Credentials Credentials
@@ -205,10 +215,6 @@ func (c *Client) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 
 	req.Header.Add(userAgentHeader, userAgent)
-	if c.ApplicationID != "" {
-		req.Header.Add(applicationIDHeader, c.ApplicationID)
-	}
-
 	if c.Credentials != nil {
 		if err := c.Credentials.Modify(req); err != nil {
 			return nil, err
@@ -217,13 +223,13 @@ func (c *Client) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	res, err := c.transport().RoundTrip(req)
 	if err != nil {
-		return res, httperr.NewError(err, httperr.RedactNoOp(), req, res)
+		return res, err
 	}
 
 	if res.StatusCode > 399 || res.StatusCode < 200 {
 		body, err := ioutil.ReadAll(res.Body)
 		if err != nil {
-			return res, httperr.NewError(err, httperr.RedactNoOp(), req, res)
+			return res, err
 		}
 
 		apiErr := &Error{
@@ -234,7 +240,7 @@ func (c *Client) RoundTrip(req *http.Request) (*http.Response, error) {
 		if len(body) > 0 {
 			err = json.Unmarshal(body, apiErr)
 			if err != nil {
-				return res, httperr.NewError(err, httperr.RedactNoOp(), req, res)
+				return res, err
 			}
 		}
 		return res, apiErr
@@ -252,7 +258,7 @@ func (c *Client) Do(req *http.Request, body, result interface{}) (*http.Response
 	if body != nil {
 		bd, err := json.Marshal(body)
 		if err != nil {
-			return nil, httperr.NewError(err, httperr.RedactNoOp(), req, nil)
+			return nil, err
 		}
 		req.Body = ioutil.NopCloser(bytes.NewReader(bd))
 		req.ContentLength = int64(len(bd))
@@ -266,7 +272,7 @@ func (c *Client) Do(req *http.Request, body, result interface{}) (*http.Response
 
 	if result != nil {
 		if err := json.NewDecoder(res.Body).Decode(result); err != nil {
-			return res, httperr.NewError(err, httperr.RedactNoOp(), req, res)
+			return res, err
 		}
 	}
 	return res, nil

@@ -11,7 +11,13 @@ import (
 	"github.com/facebookgo/parse"
 )
 
-var realTransport = true
+var (
+	realTransport = true
+
+	defaultParseClient = &parse.Client{
+		Credentials: defaultRestAPIKey,
+	}
+)
 
 func TestPostDeleteObject(t *testing.T) {
 	t.Parallel()
@@ -68,9 +74,7 @@ func TestPostDeleteObject(t *testing.T) {
 
 func TestMissingCredentials(t *testing.T) {
 	t.Parallel()
-	c := &parse.Client{
-		ApplicationID: defaultApplicationID,
-	}
+	var c parse.Client
 	req := http.Request{Method: "GET", URL: &url.URL{Path: "classes/Foo/Bar"}}
 	_, err := c.Do(&req, nil, nil)
 	if err == nil {
