@@ -49,25 +49,11 @@ func TestErrorCases(t *testing.T) {
 				Method: "GET",
 				URL: &url.URL{
 					Scheme: "https",
-					Host:   "www.eadf5cfd365145e99d2a3ddeec5d5f00.com",
-					Path:   "/",
-				},
-			},
-			Error: "foo bar",
-			Transport: transportFunc(func(r *http.Request) (*http.Response, error) {
-				return nil, errors.New("foo bar")
-			}),
-		},
-		{
-			Request: &http.Request{
-				Method: "GET",
-				URL: &url.URL{
-					Scheme: "https",
 					Host:   "api.parse.com",
 					Path:   "/1/classes/Foo/Bar",
 				},
 			},
-			Error:      `code 101 and message "object not found for get"`,
+			Error:      `parse: api error with code=101 and message="object not found for get"`,
 			StatusCode: http.StatusNotFound,
 			Transport: transportFunc(func(r *http.Request) (*http.Response, error) {
 				j := jsonB(t, parse.Error{
@@ -101,7 +87,7 @@ func TestErrorCases(t *testing.T) {
 				Method: "GET",
 				URL:    &url.URL{Path: "/"},
 			},
-			Error:      `invalid character '<' looking for beginning of value`,
+			Error:      `error with status=404 and body="<html>`,
 			StatusCode: 404,
 			Transport: transportFunc(func(r *http.Request) (*http.Response, error) {
 				return &http.Response{
@@ -122,17 +108,11 @@ func TestErrorCases(t *testing.T) {
 			c.Transport = ec.Transport
 		}
 		res, err := c.Do(ec.Request, ec.Body, nil)
-		if err == nil {
-			t.Error("was expecting error")
-		}
-		ensure.StringContains(t, err.Error(), ec.Error)
+		ensure.NotNil(t, err)
+		ensure.StringContains(t, err.Error(), ec.Error, ec)
 		if ec.StatusCode != 0 {
-			if res == nil {
-				t.Error("did not get expected http.Response")
-			}
-			if res.StatusCode != ec.StatusCode {
-				t.Errorf("expected %d got %d", ec.StatusCode, res.StatusCode)
-			}
+			ensure.False(t, res == nil, ec)
+			ensure.DeepEqual(t, res.StatusCode, ec.StatusCode, ec)
 		}
 	}
 }
@@ -223,9 +203,7 @@ func TestServerAbort(t *testing.T) {
 		)
 
 		u, err := url.Parse(server.URL)
-		if err != nil {
-			t.Fatal(err)
-		}
+		ensure.Nil(t, err)
 
 		c := &parse.Client{
 			Credentials: defaultRestAPIKey,

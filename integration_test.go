@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 	"testing"
 
+	"github.com/facebookgo/ensure"
 	"github.com/facebookgo/parse"
 )
 
@@ -77,12 +79,6 @@ func TestMissingCredentials(t *testing.T) {
 	var c parse.Client
 	req := http.Request{Method: "GET", URL: &url.URL{Path: "classes/Foo/Bar"}}
 	_, err := c.Do(&req, nil, nil)
-	if err == nil {
-		t.Fatal("was expecting error")
-	}
-	const msg = `GET https://api.parse.com/1/classes/Foo/Bar got 401 ` +
-		`Unauthorized failed with message unauthorized`
-	if actual := err.Error(); actual != msg {
-		t.Fatalf(`expected "%s" got "%s"`, msg, actual)
-	}
+	ensure.NotNil(t, err)
+	ensure.Err(t, err, regexp.MustCompile(`parse: api error with message="unauthorized"`))
 }

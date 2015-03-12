@@ -110,31 +110,37 @@ func (t SessionToken) Modify(r *http.Request) error {
 	return nil
 }
 
-// An Error from the Parse API.
+// An Error from the Parse API. When a valid Parse JSON error is found, the
+// returned error will be of this type.
 type Error struct {
-	// These are provided by the Parse API and may not always be available.
 	Message string `json:"error"`
 	Code    int    `json:"code"`
-
-	// This is the HTTP StatusCode.
-	StatusCode int `json:"-"`
-
-	request  *http.Request
-	response *http.Response
 }
 
 func (e *Error) Error() string {
 	var buf bytes.Buffer
+	fmt.Fprint(&buf, "parse: api error with ")
 	if e.Code != 0 {
-		fmt.Fprintf(&buf, "code %d", e.Code)
+		fmt.Fprintf(&buf, "code=%d", e.Code)
 	}
 	if e.Code != 0 && e.Message != "" {
 		fmt.Fprint(&buf, " and ")
 	}
 	if e.Message != "" {
-		fmt.Fprintf(&buf, "message %q", e.Message)
+		fmt.Fprintf(&buf, "message=%q", e.Message)
 	}
 	return buf.String()
+}
+
+// A RawError with the HTTP StatusCode and Body. When a valid Parse JSON error
+// is not found, the returned error will be of this type.
+type RawError struct {
+	StatusCode int
+	Body       []byte
+}
+
+func (e *RawError) Error() string {
+	return fmt.Sprintf("parse: error with status=%d and body=%q", e.StatusCode, e.Body)
 }
 
 // Client provides access to the Parse API.
@@ -232,18 +238,16 @@ func (c *Client) RoundTrip(req *http.Request) (*http.Response, error) {
 			return res, err
 		}
 
-		apiErr := &Error{
-			StatusCode: res.StatusCode,
-			request:    req,
-			response:   res,
-		}
 		if len(body) > 0 {
-			err = json.Unmarshal(body, apiErr)
-			if err != nil {
-				return res, err
+			var apiErr Error
+			if json.Unmarshal(body, &apiErr) == nil {
+				return res, &apiErr
 			}
 		}
-		return res, apiErr
+		return res, &RawError{
+			StatusCode: res.StatusCode,
+			Body:       body,
+		}
 	}
 
 	return res, nil
@@ -260,6 +264,10 @@ func (c *Client) Do(req *http.Request, body, result interface{}) (*http.Response
 		if err != nil {
 			return nil, err
 		}
+		if req.Header == nil {
+			req.Header = make(http.Header)
+		}
+		req.Header.Set("Content-Type", "application/json")
 		req.Body = ioutil.NopCloser(bytes.NewReader(bd))
 		req.ContentLength = int64(len(bd))
 	}
