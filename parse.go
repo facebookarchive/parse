@@ -13,7 +13,7 @@ import (
 
 const (
 	userAgentHeader     = "User-Agent"
-	userAgent           = "go-parse-1"
+	defaultUserAgent    = "go-parse-1"
 	masterKeyHeader     = "X-Parse-Master-Key"
 	restAPIKeyHeader    = "X-Parse-REST-API-Key"
 	sessionTokenHeader  = "X-Parse-Session-Token"
@@ -156,6 +156,10 @@ type Client struct {
 
 	// Credentials if set, will be included on every request.
 	Credentials Credentials
+
+	// UserAgent to use in the User-Agent header.  When nil defaultUserAgent
+	// will be used.
+	UserAgent string
 }
 
 func (c *Client) transport() http.RoundTripper {
@@ -218,6 +222,13 @@ func (c *Client) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	if req.Header == nil {
 		req.Header = make(http.Header)
+	}
+
+	var userAgent string
+	if c.UserAgent == "" {
+		userAgent = defaultUserAgent
+	} else {
+		userAgent = c.UserAgent
 	}
 
 	req.Header.Add(userAgentHeader, userAgent)
