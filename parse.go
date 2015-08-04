@@ -234,6 +234,7 @@ func (c *Client) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	if res.StatusCode > 399 || res.StatusCode < 200 {
 		body, err := ioutil.ReadAll(res.Body)
+		res.Body.Close()
 		if err != nil {
 			return res, err
 		}
